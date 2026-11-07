@@ -1,0 +1,16 @@
+name: flash-tech
+
+services:
+  web:
+    build: ./web
+    container_name: flash-tech-web
+    restart: unless-stopped
+    mem_limit: 768m
+    ports:
+      - "127.0.0.1:3401:3000"
+    environment:
+      NODE_ENV: production
+    networks: [flash-tech_net]
+
+networks:
+  flash-tech_net:
