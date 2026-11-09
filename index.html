@@ -326,6 +326,19 @@ const $ = (s, el=document) => el.querySelector(s);
 const $$ = (s, el=document) => [...el.querySelectorAll(s)];
 const clone = o => JSON.parse(JSON.stringify(o));
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+// Ids end up in HTML attributes and are used as dataset keys. They are escaped at every
+// interpolation site *and* restricted to this alphabet on import (defence in depth: either
+// one alone would stop P0-1, both together survive the next escaping mistake).
+const ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
+const idOk = v => typeof v === "string" && ID_RE.test(v);
+const isObj = v => !!v && typeof v === "object" && !Array.isArray(v);
+function anyFunction(o, depth = 0){
+  if (typeof o === "function") return true;
+  if (!o || typeof o !== "object" || depth > 3) return false;
+  return Object.values(o).some(v => anyFunction(v, depth + 1));
+}
+const SAFE_URL_RE = /^(https?:\/\/|file:\/\/)/i;
+const safeUrl = v => typeof v === "string" && SAFE_URL_RE.test(v.trim());
 const pad = n => String(n).padStart(2,"0");
 const clamp = (x, lo=0, hi=1) => Math.max(lo, Math.min(hi, x));
 const nowUtc = () => new Date().toISOString();
@@ -437,11 +450,11 @@ function cleanTags(v){
   for (let x of arr) { x = x.trim().replace(/^#/, ""); if (x && !seen.has(x.toLowerCase())) seen.set(x.toLowerCase(), x); }
   return [...seen.values()].sort((a,b) => a.toLowerCase().localeCompare(b.toLowerCase()));
 }
-function validateTask(f){
+function validateTask(f, st = S){
   if (!f.title || !f.title.trim()) return "Title is required";
-  if (!domainById(f.domain_id)) return "Pick a domain";
-  if (f.project_id && !projectById(f.project_id)) return "Unknown project";
-  if (f.research_id && !researchById(f.research_id)) return "Unknown research topic";
+  if (!st.domains.some(d => d.id === f.domain_id)) return "Unknown domain";
+  if (f.project_id && !st.projects.some(p => p.id === f.project_id)) return "Unknown project";
+  if (f.research_id && !st.research.some(r => r.id === f.research_id)) return "Unknown research topic";
   if (!STATUS_LABEL[f.status]) return "Bad status";
   if (!PRIORITIES.includes(f.priority)) return "Bad priority";
   if (!RECURRENCES.includes(f.recurrence)) return "Bad recurrence";
@@ -527,9 +540,9 @@ function visibleTasks(){
 }
 
 /* ------------------------------------------------------------------ projects */
-function validateProject(p){
+function validateProject(p, st = S){
   if (!p.name || !p.name.trim()) return "Project name is required";
-  if (!domainById(p.domain_id)) return "Pick a domain";
+  if (!st.domains.some(d => d.id === p.domain_id)) return "Unknown domain";
   if (!(Number.isInteger(p.criticality) && p.criticality >= 1 && p.criticality <= 5)) return "Criticality must be 1–5";
   if (!PROJECT_STATUSES.includes(p.status)) return "Bad project status";
   if (!validDue(p.due_date)) return "Due date must be a real date";
@@ -614,12 +627,12 @@ function domainEditorHtml(){
   return list.map((d, i) => {
     const u = domainUsage(d.id), inUse = u.tasks + u.projects + u.topics, confirming = ui.domDelete === d.id;
     return `<div class="drow" style="--c:${esc(d.color)}">
-        <input type="color" data-dom="${d.id}" data-k="color" value="${esc(d.color)}" title="Color">
-        <input class="inp" data-dom="${d.id}" data-k="name" value="${esc(d.name)}" maxlength="40" aria-label="Domain name">
+        <input type="color" data-dom="${esc(d.id)}" data-k="color" value="${esc(d.color)}" title="Color">
+        <input class="inp" data-dom="${esc(d.id)}" data-k="name" value="${esc(d.name)}" maxlength="40" aria-label="Domain name">
         <span class="use hide-sm">${useLabel(u)}</span>
-        <button class="iconbtn" data-dommove="${d.id}" data-dir="-1" title="Move up" ${i === 0 ? "disabled" : ""}>↑</button>
-        <button class="iconbtn" data-dommove="${d.id}" data-dir="1" title="Move down" ${i === list.length - 1 ? "disabled" : ""}>↓</button>
-        <button class="iconbtn del" data-domdel="${d.id}" title="Delete domain" ${list.length <= 1 ? "disabled" : ""}>🗑</button>
+        <button class="iconbtn" data-dommove="${esc(d.id)}" data-dir="-1" title="Move up" ${i === 0 ? "disabled" : ""}>↑</button>
+        <button class="iconbtn" data-dommove="${esc(d.id)}" data-dir="1" title="Move down" ${i === list.length - 1 ? "disabled" : ""}>↓</button>
+        <button class="iconbtn del" data-domdel="${esc(d.id)}" title="Delete domain" ${list.length <= 1 ? "disabled" : ""}>🗑</button>
       </div>
       ${confirming ? `<div class="dconfirm"><b>Delete “${esc(d.name)}”?</b>
         ${inUse ? `It has ${useLabel(u)}. Move ${inUse > 1 ? "them" : "it"} to:
@@ -653,9 +666,9 @@ function refreshDomains(msg){
 }
 
 /* ------------------------------------------------------------------ research topics */
-function validateTopic(r){
+function validateTopic(r, st = S){
   if (!r.name || !r.name.trim()) return "Topic name is required";
-  if (r.domain_id && !domainById(r.domain_id)) return "Unknown domain";
+  if (r.domain_id && !st.domains.some(d => d.id === r.domain_id)) return "Unknown domain";
   if (!RSTATUS_LABEL[r.status]) return "Bad status";
   if (!(Number.isInteger(r.level) && r.level >= 0 && r.level <= 5)) return "Comfort level must be 0–5";
   return null;
@@ -764,44 +777,156 @@ function download(name, text, type="application/json"){
   a.href = URL.createObjectURL(new Blob([text], {type})); a.download = name;
   document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
 }
+/* Import is the one place the app accepts untrusted input. The whole file is validated
+   against a schema before S is touched: every failure aborts with nothing changed. */
+const EXPORT_ARRAYS = ["domains","projects","tasks","notes","attachments","research","tags","task_tags"];
 function importData(data){
-  if (!data || data.format !== "taskapp-export") throw new Error("Not a TaskApp export file");
-  if ((data.version || 0) > 1) throw new Error("Export is from a newer TaskApp version");
+  /* ---- 1. shape of the envelope ---- */
+  if (!isObj(data)) throw new Error("Not a TaskApp export file");
+  if (data.format !== "taskapp-export") throw new Error("Not a TaskApp export file");
+  if (!Number.isInteger(data.version)) throw new Error("Import rejected — the file has no version field, so it is not a TaskApp export. Nothing was changed.");
+  if (data.version > 1) throw new Error(`Export is from a newer TaskApp version (${data.version}). Nothing was changed.`);
+  if (data.version < 1) throw new Error(`Export version ${data.version} is not supported. Nothing was changed.`);
+  for (const k of EXPORT_ARRAYS)
+    if (data[k] !== undefined && !Array.isArray(data[k]))
+      throw new Error(`Import rejected — "${k}" must be a list, not ${typeof data[k]}. Nothing was changed.`);
+
+  /* ---- 2. stage everything; S is replaced only when every row passes ---- */
+  const next = clone(S);
   const st = {inserted:0, updated:0, skipped:0};
+  const errors = [];
+  const fail = (where, msg) => errors.push(`${where}: ${msg}`);
+  const seen = {domains:new Set(), projects:new Set(), tasks:new Set(), notes:new Set(), attachments:new Set(), research:new Set()};
+  const claim = (table, row, where) => {
+    if (seen[table].has(row.id)) { fail(where, `duplicate id "${String(row.id).slice(0, 40)}" in this file`); return false; }
+    seen[table].add(row.id); return true;
+  };
   const upsert = (arr, row, versioned=true) => {
     const i = arr.findIndex(x => x.id === row.id);
     if (i < 0) { arr.push(row); st.inserted++; }
     else if (versioned && (row.updated_at || "") > (arr[i].updated_at || "")) { arr[i] = row; st.updated++; }
     else st.skipped++;
   };
-  for (const d of data.domains || []) {
-    if (domainById(d.id)) continue;
-    if (S.domains.some(x => x.name.toLowerCase() === d.name.toLowerCase())) { st.skipped++; continue; }
-    S.domains.push({id:d.id, name:d.name, weight:+d.weight || 1, color:d.color || "#6b7280", sort_order:d.sort_order || 99}); st.inserted++;
+
+  for (const [i, d] of (data.domains || []).entries()) {
+    const where = `domains[${i}]`;
+    if (!isObj(d) || anyFunction(d)) { fail(where, "must be a plain object"); continue; }
+    if (!idOk(d.id)) { fail(where, "id must be 1–64 letters, digits, - or _"); continue; }
+    if (!claim("domains", d, where)) continue;
+    const name = typeof d.name === "string" ? d.name.trim() : "";
+    if (!name) { fail(where, "name must be a non-empty string"); continue; }
+    if (name.length > 40) { fail(where, "name is longer than 40 characters"); continue; }
+    if (next.domains.some(x => x.id === d.id)) continue;                       // exists here: keep local
+    if (next.domains.some(x => x.name.toLowerCase() === name.toLowerCase())) { st.skipped++; continue; }
+    next.domains.push({
+      id: d.id, name,
+      weight: Number.isFinite(d.weight) ? d.weight : 1,
+      color: /^#[0-9a-fA-F]{6}$/.test(d.color || "") ? d.color : "#6b7280",
+      sort_order: Number.isInteger(d.sort_order) ? d.sort_order : Math.max(0, ...next.domains.map(x => x.sort_order || 0)) + 1,
+    });
+    st.inserted++;
   }
-  for (const p of data.projects || []) { if (!domainById(p.domain_id)) { st.skipped++; continue; } upsert(S.projects, {...p}); }
-  for (const r of data.research || []) {
-    const row = {...r, tags: cleanTags(r.tags || []), links: r.links || [], log: r.log || [], level: Number.isInteger(r.level) ? r.level : 0, status: RSTATUS_LABEL[r.status] ? r.status : "explore"};
-    if (row.domain_id && !domainById(row.domain_id)) row.domain_id = null;
-    upsert(S.research, row);
+
+  for (const [i, p] of (data.projects || []).entries()) {
+    const where = `projects[${i}]`;
+    if (!isObj(p) || anyFunction(p)) { fail(where, "must be a plain object"); continue; }
+    if (!idOk(p.id)) { fail(where, "id must be 1–64 letters, digits, - or _"); continue; }
+    if (!claim("projects", p, where)) continue;
+    const row = Object.assign({description:"", criticality:3, status:"active", due_date:null,
+      created_at:nowUtc(), updated_at:nowUtc(), archived_at:null}, p);
+    if (typeof row.name !== "string") { fail(where, "name must be a string"); continue; }
+    row.name = row.name.trim();
+    const err = validateProject(row, next); if (err) { fail(where, err); continue; }
+    upsert(next.projects, row);
   }
-  const tagName = Object.fromEntries((data.tags || []).map(g => [g.id, g.name]));
+
+  for (const [i, r] of (data.research || []).entries()) {
+    const where = `research[${i}]`;
+    if (!isObj(r) || anyFunction(r)) { fail(where, "must be a plain object"); continue; }
+    if (!idOk(r.id)) { fail(where, "id must be 1–64 letters, digits, - or _"); continue; }
+    if (!claim("research", r, where)) continue;
+    const row = Object.assign({status:"explore", level:0, tags:[], body:"", links:[], log:[],
+      created_at:nowUtc(), updated_at:nowUtc()}, r);
+    if (typeof row.name !== "string") { fail(where, "name must be a string"); continue; }
+    row.name = row.name.trim();
+    if (typeof row.body !== "string") { fail(where, "body must be a string"); continue; }
+    row.tags = cleanTags(Array.isArray(row.tags) ? row.tags : []);
+    if (row.domain_id && !next.domains.some(d => d.id === row.domain_id)) row.domain_id = null;   // optional link
+    if (!Array.isArray(row.links) || !Array.isArray(row.log)) { fail(where, "links and log must be lists"); continue; }
+    let bad = false;
+    for (const [j, l] of row.links.entries())
+      if (!isObj(l) || !idOk(l.id) || !safeUrl(l.url)) { fail(`${where}.links[${j}]`, "needs a valid id and an http(s) or file:// url"); bad = true; }
+    for (const [j, e] of row.log.entries())
+      if (!isObj(e) || !idOk(e.id) || typeof e.body !== "string" || !e.body.trim()) { fail(`${where}.log[${j}]`, "needs a valid id and a non-empty body"); bad = true; }
+    if (bad) continue;
+    const err = validateTopic(row, next); if (err) { fail(where, err); continue; }
+    upsert(next.research, row);
+  }
+
+  const tagName = new Map((data.tags || []).filter(isObj).map(g => [g.id, g.name]));
   const tagsByTask = {};
-  for (const tt of data.task_tags || []) if (tagName[tt.tag_id]) (tagsByTask[tt.task_id] ||= []).push(tagName[tt.tag_id]);
-  for (const t of data.tasks || []) {
-    if (!domainById(t.domain_id)) { st.skipped++; continue; }
-    const row = {...t, tags: cleanTags(t.tags || tagsByTask[t.id] || [])};
-    if (row.project_id && !projectById(row.project_id)) row.project_id = null;
-    if (row.research_id && !researchById(row.research_id)) row.research_id = null;
-    if (!row.created_at) row.created_at = nowUtc();
-    upsert(S.tasks, row);
+  for (const [i, tt] of (data.task_tags || []).entries()) {
+    if (!isObj(tt) || !tagName.has(tt.tag_id)) continue;
+    if (typeof tt.task_id !== "string") { fail(`task_tags[${i}]`, "task_id must be a string"); continue; }
+    (tagsByTask[tt.task_id] ||= []).push(tagName.get(tt.tag_id));
   }
-  for (const n of data.notes || []) {
-    if ((n.task_id && !taskById(n.task_id)) || (n.project_id && !projectById(n.project_id))) { st.skipped++; continue; }
-    upsert(S.notes, {...n});
+  for (const [i, t] of (data.tasks || []).entries()) {
+    const where = `tasks[${i}]`;
+    if (!isObj(t) || anyFunction(t)) { fail(where, "must be a plain object"); continue; }
+    if (!idOk(t.id)) { fail(where, "id must be 1–64 letters, digits, - or _"); continue; }
+    if (!claim("tasks", t, where)) continue;
+    const row = Object.assign({description:"", project_id:null, status:"todo", position:0,
+      priority:"medium", due_date:null, recurrence:"none", recurrence_interval:1,
+      recurrence_parent_id:null, research_id:null, source:"web", external_id:null,
+      created_at:nowUtc(), updated_at:nowUtc(), completed_at:null, archived_at:null}, t);
+    if (typeof row.title !== "string") { fail(where, "title must be a string"); continue; }
+    row.title = row.title.trim();
+    if (!row.title) { fail(where, "title must not be empty"); continue; }
+    if (row.title.length > 500) { fail(where, "title is longer than 500 characters"); continue; }
+    if (row.project_id && !next.projects.some(p => p.id === row.project_id)) { fail(where, "unknown project_id"); continue; }
+    if (row.research_id && !next.research.some(r => r.id === row.research_id)) { fail(where, "unknown research_id"); continue; }
+    if (row.recurrence_parent_id && row.recurrence_parent_id !== row.id && !next.tasks.some(x => x.id === row.recurrence_parent_id)) row.recurrence_parent_id = null;
+    row.tags = cleanTags(Array.isArray(row.tags) && row.tags.length ? row.tags : (tagsByTask[row.id] || []));
+    const err = validateTask(row, next); if (err) { fail(where, err); continue; }
+    upsert(next.tasks, row);
   }
-  for (const a of data.attachments || []) { if (!taskById(a.task_id)) { st.skipped++; continue; } upsert(S.attachments, {...a}, false); }
-  for (const t of S.tasks) { delete t.score; delete t.score_override; }
+
+  for (const [i, n] of (data.notes || []).entries()) {
+    const where = `notes[${i}]`;
+    if (!isObj(n) || anyFunction(n)) { fail(where, "must be a plain object"); continue; }
+    if (!idOk(n.id)) { fail(where, "id must be 1–64 letters, digits, - or _"); continue; }
+    if (!claim("notes", n, where)) continue;
+    const row = Object.assign({task_id:null, project_id:null, created_at:nowUtc(), updated_at:nowUtc()}, n);
+    if (typeof row.body !== "string" || !row.body.trim()) { fail(where, "body must be a non-empty string"); continue; }
+    if (!row.task_id && !row.project_id) { fail(where, "a note needs a task_id or a project_id"); continue; }
+    if (row.task_id && !next.tasks.some(t => t.id === row.task_id)) { fail(where, "unknown task_id"); continue; }
+    if (row.project_id && !next.projects.some(p => p.id === row.project_id)) { fail(where, "unknown project_id"); continue; }
+    upsert(next.notes, row);
+  }
+
+  for (const [i, a] of (data.attachments || []).entries()) {
+    const where = `attachments[${i}]`;
+    if (!isObj(a) || anyFunction(a)) { fail(where, "must be a plain object"); continue; }
+    if (!idOk(a.id)) { fail(where, "id must be 1–64 letters, digits, - or _"); continue; }
+    if (!claim("attachments", a, where)) continue;
+    const row = Object.assign({mime_type:"application/octet-stream", size_bytes:0, created_at:nowUtc()}, a);
+    if (!next.tasks.some(t => t.id === row.task_id)) { fail(where, "unknown task_id"); continue; }
+    if (typeof row.file_name !== "string" || !row.file_name.trim()) { fail(where, "file_name must be a non-empty string"); continue; }
+    if (row.url != null && !safeUrl(row.url)) { fail(where, "url must be http(s):// or file://"); continue; }
+    if (row.data_url != null && !(typeof row.data_url === "string" && /^data:/.test(row.data_url))) { fail(where, "data_url must be a data: URL"); continue; }
+    if (row.url == null && row.data_url == null) { fail(where, "attachment needs a url or a data_url"); continue; }
+    if (!Number.isFinite(row.size_bytes)) row.size_bytes = 0;
+    upsert(next.attachments, row, false);
+  }
+
+  if (errors.length) {
+    const shown = errors.slice(0, 6).map(e => "• " + e).join("\n");
+    const err = new Error(`Import rejected — ${errors.length} problem${errors.length === 1 ? "" : "s"}, nothing was changed.\n${shown}${errors.length > 6 ? `\n• …and ${errors.length - 6} more` : ""}`);
+    err.importErrors = errors;
+    throw err;
+  }
+  for (const t of next.tasks) { delete t.score; delete t.score_override; }
+  S = next;
   return st;
 }
 
@@ -920,7 +1045,7 @@ function renderFilters(){
     `<button class="chip" data-act="manageDomains" title="Create, rename, recolor, reorder or delete domains">✎ Domains</button>` +
     (ui.view !== "projects" && ui.view !== "research" && ui.view !== "home" ? `<select class="inp" id="projFilter" style="width:auto;max-width:240px;padding:4px 8px;font-size:12px;border-radius:999px">
       <option value="">All projects</option><option value="__none" ${ui.project==="__none"?"selected":""}>No project</option>
-      ${S.projects.filter(p => !ui.domain || p.domain_id === ui.domain).sort((a,b)=>a.name.localeCompare(b.name)).map(p => `<option value="${p.id}" ${ui.project===p.id?"selected":""}>${esc(p.name)}</option>`).join("")}
+      ${S.projects.filter(p => !ui.domain || p.domain_id === ui.domain).sort((a,b)=>a.name.localeCompare(b.name)).map(p => `<option value="${esc(p.id)}" ${ui.project===p.id?"selected":""}>${esc(p.name)}</option>`).join("")}
     </select>` : "");
 }
 function dueBadge(t){
@@ -932,7 +1057,7 @@ function dueBadge(t){
 function cardHtml(t){
   const d = domainById(t.domain_id), p = t.project_id ? projectById(t.project_id) : null;
   const nNotes = S.notes.filter(n => n.task_id === t.id).length, nAtt = attachmentsFor(t.id).length;
-  return `<div class="card ${t.status==="completed"?"done":""}" data-id="${t.id}" style="--c:${esc(d?.color||"#888")}">
+  return `<div class="card ${t.status==="completed"?"done":""}" data-id="${esc(t.id)}" style="--c:${esc(d?.color||"#888")}">
     <div class="t">${esc(t.title)}</div>
     <div class="meta">
       <span class="badge ${t.priority}">${t.priority}</span>
@@ -978,8 +1103,8 @@ function themePickerHtml(){
 const LONG_DATE = () => new Date().toLocaleDateString(undefined, {weekday:"long", month:"long", day:"numeric"});
 function hrowHtml(t){
   const d = domainById(t.domain_id), p = t.project_id ? projectById(t.project_id) : null, done = t.status === "completed";
-  return `<div class="hrow ${done ? "done" : ""}" data-id="${t.id}" style="--c:${esc(d?.color || "#888")}">
-    <button class="chk" data-done="${t.id}" title="${done ? "Mark not done" : "Mark done"}">✓</button>
+  return `<div class="hrow ${done ? "done" : ""}" data-id="${esc(t.id)}" style="--c:${esc(d?.color || "#888")}">
+    <button class="chk" data-done="${esc(t.id)}" title="${done ? "Mark not done" : "Mark done"}">✓</button>
     <span class="ht" title="${esc(t.title)}">${esc(t.title)}</span>
     <span class="meta">${t.status === "in_progress" && !done ? '<span class="badge hide-sm" style="color:var(--info-fg)">in progress</span>' : ""}${t.status === "blocked" ? '<span class="badge hide-sm" style="color:var(--danger-fg)">blocked</span>' : ""}<span class="badge ${t.priority}">${t.priority}</span>${dueBadge(t)}${p ? `<span class="badge hide-sm">▸ ${esc(p.name)}</span>` : ""}</span>
   </div>`;
@@ -1032,20 +1157,20 @@ function renderHome(main){
   const byDomain = sortedDomains().map(d => {
     const ts = open.filter(t => t.domain_id === d.id).sort(byImportance);
     if (!ts.length) return "";
-    return `<details class="grp" data-hdom="${d.id}" ${ui.homeOpen.has(d.id) || ui.q ? "open" : ""}><summary><span class="dot" style="--c:${esc(d.color)}"></span><b>${esc(d.name)}</b><span class="muted small">${ts.length} open</span></summary>
+    return `<details class="grp" data-hdom="${esc(d.id)}" ${ui.homeOpen.has(d.id) || ui.q ? "open" : ""}><summary><span class="dot" style="--c:${esc(d.color)}"></span><b>${esc(d.name)}</b><span class="muted small">${ts.length} open</span></summary>
       <div class="rows">${ts.map(hrowHtml).join("")}</div></details>`;
   }).join("");
 
   const projHtml = projects.length ? projects.map(p => {
     const st = projectStats(p.id), d = domainById(p.domain_id);
     const next = S.tasks.filter(t => t.project_id === p.id && t.status !== "completed" && t.due_date && !t.archived_at).sort((a,b) => a.due_date.localeCompare(b.due_date))[0];
-    return `<div class="hitem" data-open-project="${p.id}" style="--c:${esc(d?.color)}"><span class="name" title="${esc(p.name)}">${esc(p.name)}</span>
+    return `<div class="hitem" data-open-project="${esc(p.id)}" style="--c:${esc(d?.color)}"><span class="name" title="${esc(p.name)}">${esc(p.name)}</span>
       ${next ? `<span class="muted small hide-sm">next ${esc(fmtDue(next.due_date))}</span>` : ""}<span class="muted small">${st.counts.completed}/${st.total}</span><span class="mini"><i style="width:${Math.round(st.progress*100)}%"></i></span></div>`;
   }).join("") : `<div class="hnone">No active projects.</div>`;
 
   const topicHtml = topics.length ? topics.slice(0, 8).map(r => {
     const d = domainById(r.domain_id), last = r.log.length ? r.log.map(e => e.created_at).sort().pop() : null;
-    return `<div class="hitem" data-open-topic="${r.id}" style="--c:${esc(d?.color || "#64748b")}"><span class="name">${esc(r.name)}</span>
+    return `<div class="hitem" data-open-topic="${esc(r.id)}" style="--c:${esc(d?.color || "#64748b")}"><span class="name">${esc(r.name)}</span>
       <span class="badge rs-${r.status}">${RSTATUS_LABEL[r.status]}</span>${levelDots(r.level)}<span class="muted small hide-sm">${last ? fmtWhen(last).split(" ").slice(0,2).join(" ") : ""}</span></div>`;
   }).join("") + (topics.length > 8 ? `<div class="hnone">+${topics.length - 8} more</div>` : "") : `<div class="hnone">No research topics yet.</div>`;
 
@@ -1110,11 +1235,11 @@ function renderList(main){
   const tasks = visibleTasks().filter(t => t.status !== "completed" || ui.q).sort(byImportance);
   if (!S.tasks.length) { main.innerHTML = emptyHtml(); return; }
   main.innerHTML = `<table><thead><tr><th>Task</th><th class="hide-sm">Domain</th><th class="hide-sm">Project</th><th>Status</th><th class="hide-sm">Priority</th><th>Due</th></tr></thead><tbody>
-    ${tasks.map(t => { const d = domainById(t.domain_id), p = projectById(t.project_id); return `<tr class="row" data-id="${t.id}">
+    ${tasks.map(t => { const d = domainById(t.domain_id), p = projectById(t.project_id); return `<tr class="row" data-id="${esc(t.id)}">
       <td><b>${esc(t.title)}</b> ${t.recurrence!=="none"?"🔁":""}</td>
       <td class="hide-sm"><span class="dot" style="--c:${esc(d?.color)}"></span> ${esc(d?.name)}</td>
       <td class="hide-sm">${esc(p?.name || "—")}</td>
-      <td><select data-status-for="${t.id}">${STATUSES.map(([s,l]) => `<option value="${s}" ${s===t.status?"selected":""}>${l}</option>`).join("")}</select></td>
+      <td><select data-status-for="${esc(t.id)}">${STATUSES.map(([s,l]) => `<option value="${s}" ${s===t.status?"selected":""}>${l}</option>`).join("")}</select></td>
       <td class="hide-sm"><span class="badge ${t.priority}">${t.priority}</span></td>
       <td>${dueBadge(t) || '<span class="muted">—</span>'}</td></tr>`; }).join("")}
   </tbody></table>
@@ -1137,10 +1262,10 @@ function renderFocus(main){
           ${t.status === "in_progress" ? '<span class="badge" style="color:var(--info-fg)">in progress</span>' : ""}</div>
         ${t.description ? `<p class="muted" style="white-space:pre-wrap;margin:10px 0 0">${esc(t.description)}</p>` : ""}
         <div class="acts">
-          ${t.status === "todo" ? `<button class="btn primary" data-focus="start" data-id="${t.id}">▶ Start</button>` : ""}
-          <button class="btn ${t.status === "in_progress" ? "primary" : ""}" data-focus="done" data-id="${t.id}">✓ Done</button>
-          <button class="btn" data-focus="block" data-id="${t.id}">Blocked</button>
-          <button class="btn" data-focus="open" data-id="${t.id}">Details</button>
+          ${t.status === "todo" ? `<button class="btn primary" data-focus="start" data-id="${esc(t.id)}">▶ Start</button>` : ""}
+          <button class="btn ${t.status === "in_progress" ? "primary" : ""}" data-focus="done" data-id="${esc(t.id)}">✓ Done</button>
+          <button class="btn" data-focus="block" data-id="${esc(t.id)}">Blocked</button>
+          <button class="btn" data-focus="open" data-id="${esc(t.id)}">Details</button>
         </div></div>`; }).join("")
       : `<div class="empty"><h2>All clear 🎉</h2><p>No open tasks${ui.domain || ui.project ? " for this filter" : ""}.</p></div>`}
     ${open.length > 3 ? `<p class="muted small">${open.length - 3} more open tasks are on the Board.</p>` : ""}
@@ -1149,14 +1274,14 @@ function renderFocus(main){
 function renderProjects(main){
   const ps = S.projects.filter(p => !ui.domain || p.domain_id === ui.domain).sort((a,b) => (a.status==="done") - (b.status==="done") || b.criticality - a.criticality || a.name.localeCompare(b.name));
   main.innerHTML = ps.length ? `<div class="grid">${ps.map(p => { const d = domainById(p.domain_id), st = projectStats(p.id); return `
-    <div class="pcard" data-pid="${p.id}" style="--c:${esc(d?.color)}">
+    <div class="pcard" data-pid="${esc(p.id)}" style="--c:${esc(d?.color)}">
       <h4>${esc(p.name)}</h4>
       <div class="meta"><span class="badge">${esc(d?.name)}</span><span class="badge" title="Criticality">${"★".repeat(p.criticality)}${"☆".repeat(5-p.criticality)}</span>
         ${p.status !== "active" ? `<span class="badge">${p.status.replace("_"," ")}</span>` : ""}${p.due_date ? `<span class="badge">📅 ${esc(fmtDue(p.due_date))}</span>` : ""}</div>
       <div class="prog"><i style="width:${Math.round(st.progress*100)}%"></i></div>
       <div class="small muted">${st.counts.completed}/${st.total} done · ${st.counts.in_progress} in progress · ${st.counts.blocked} blocked</div>
       ${p.description ? `<p class="small muted" style="margin:8px 0 0">${esc(p.description)}</p>` : ""}
-      <div style="margin-top:10px"><button class="btn sm" data-showboard="${p.id}">Show on board</button></div>
+      <div style="margin-top:10px"><button class="btn sm" data-showboard="${esc(p.id)}">Show on board</button></div>
     </div>`; }).join("")}</div>`
     : `<div class="empty"><h2>No projects${ui.domain ? " in this domain" : ""}</h2><p><button class="btn primary" data-act="newProject">+ New project</button></p></div>`;
 }
@@ -1164,7 +1289,7 @@ const levelDots = n => `<span class="lvl" title="Comfort: ${esc(LEVELS[n])} (${n
 function rcardHtml(r){
   const d = domainById(r.domain_id), open = topicTasks(r.id).filter(t => t.status !== "completed").length;
   const last = r.log.length ? r.log.map(e => e.created_at).sort().pop() : null;
-  return `<div class="rcard" data-rid="${r.id}" style="--c:${esc(d?.color || "#64748b")}">
+  return `<div class="rcard" data-rid="${esc(r.id)}" style="--c:${esc(d?.color || "#64748b")}">
     <h4>${esc(r.name)}</h4>
     <div class="meta"><span class="badge rs-${r.status}">${RSTATUS_LABEL[r.status]}</span>${levelDots(r.level)}
       ${r.tags.map(g => `<span class="badge tag">#${esc(g)}</span>`).join("")}</div>
@@ -1212,7 +1337,7 @@ function openTopic(id, mode){
       <div class="mdbox md ${ui.mdMode === "edit" ? "hidden" : ""}" id="r_preview">${md(r.body) || '<span class="muted">No notes yet — click Edit.</span>'}</div>
       ${!isNew ? `
         <h4 class="sec">Links &amp; resources</h4>
-        ${r.links.map(l => `<div class="att">🔗 <a href="${esc(l.url)}" target="_blank" rel="noopener" title="${esc(l.url)}">${esc(l.label || l.url)}</a><button class="x" style="font-size:16px" data-dellink="${l.id}" title="Remove link">×</button></div>`).join("") || '<p class="muted small">No links yet.</p>'}
+        ${r.links.map(l => `<div class="att">🔗 <a href="${esc(l.url)}" target="_blank" rel="noopener" title="${esc(l.url)}">${esc(l.label || l.url)}</a><button class="x" style="font-size:16px" data-dellink="${esc(l.id)}" title="Remove link">×</button></div>`).join("") || '<p class="muted small">No links yet.</p>'}
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
           <input class="inp" id="r_url" placeholder="URL or file path" style="flex:2;min-width:160px;padding:5px 8px">
           <input class="inp" id="r_label" placeholder="Label (optional)" style="flex:1;min-width:120px;padding:5px 8px">
@@ -1220,9 +1345,9 @@ function openTopic(id, mode){
         </div>
         <h4 class="sec">Study log</h4>
         <div style="display:flex;gap:8px;margin-bottom:8px"><textarea class="inp" id="r_log" placeholder="What did you study or try today?" style="min-height:44px"></textarea><button class="btn" data-act="addLog">Add</button></div>
-        ${[...r.log].sort((a,b) => b.created_at.localeCompare(a.created_at)).map(e => `<div class="logentry"><div class="when small muted" style="display:flex;justify-content:space-between"><span>${fmtWhen(e.created_at)}</span><button class="x" style="font-size:14px" data-dellog="${e.id}" title="Delete entry">×</button></div><div class="md">${md(e.body)}</div></div>`).join("") || '<p class="muted small">No study sessions logged yet.</p>'}
+        ${[...r.log].sort((a,b) => b.created_at.localeCompare(a.created_at)).map(e => `<div class="logentry"><div class="when small muted" style="display:flex;justify-content:space-between"><span>${fmtWhen(e.created_at)}</span><button class="x" style="font-size:14px" data-dellog="${esc(e.id)}" title="Delete entry">×</button></div><div class="md">${md(e.body)}</div></div>`).join("") || '<p class="muted small">No study sessions logged yet.</p>'}
         <h4 class="sec">Related tasks</h4>
-        ${tasks.map(t => `<div class="att" style="cursor:pointer" data-opentask="${t.id}"><span class="badge ${t.priority}">${t.priority}</span><span style="flex:1;${t.status==="completed"?"text-decoration:line-through;color:var(--muted)":""}">${esc(t.title)}</span><span class="muted small">${STATUS_LABEL[t.status]}</span></div>`).join("") || '<p class="muted small">No tasks linked to this topic.</p>'}
+        ${tasks.map(t => `<div class="att" style="cursor:pointer" data-opentask="${esc(t.id)}"><span class="badge ${t.priority}">${t.priority}</span><span style="flex:1;${t.status==="completed"?"text-decoration:line-through;color:var(--muted)":""}">${esc(t.title)}</span><span class="muted small">${STATUS_LABEL[t.status]}</span></div>`).join("") || '<p class="muted small">No tasks linked to this topic.</p>'}
         <button class="btn sm" data-act="taskForTopic" style="margin-top:6px">+ Task for this topic</button>
         <p class="muted small" style="margin-top:18px">Created ${fmtWhen(r.created_at)} · Updated ${fmtWhen(r.updated_at)}</p>` : ""}
     </div>
@@ -1307,9 +1432,9 @@ function openTask(id, preset={}){
       ${!isNew ? `
         <h4 class="sec">Notes</h4>
         <div style="display:flex;gap:8px;margin-bottom:8px"><textarea class="inp" id="f_note" placeholder="Add a note…" style="min-height:40px"></textarea><button class="btn" data-act="addNote">Add</button></div>
-        <div id="notes">${notesFor({task_id:t.id}).map(n => `<div class="note"><div class="when"><span>${fmtWhen(n.created_at)}</span><button class="x small" style="font-size:14px" data-delnote="${n.id}" title="Delete note">×</button></div>${esc(n.body)}</div>`).join("") || '<p class="muted small">No notes yet.</p>'}</div>
+        <div id="notes">${notesFor({task_id:t.id}).map(n => `<div class="note"><div class="when"><span>${fmtWhen(n.created_at)}</span><button class="x small" style="font-size:14px" data-delnote="${esc(n.id)}" title="Delete note">×</button></div>${esc(n.body)}</div>`).join("") || '<p class="muted small">No notes yet.</p>'}</div>
         <h4 class="sec">Attachments</h4>
-        <div id="atts">${attachmentsFor(t.id).map(a => `<div class="att">${a.url ? "🔗" : "📎"} <a ${a.url ? `href="${esc(a.url)}" target="_blank" rel="noopener"` : `href="${esc(a.data_url||"#")}" download="${esc(a.file_name)}"`}>${esc(a.file_name)}</a><span class="muted small">${a.url ? "link" : fmtSize(a.size_bytes)}</span><button class="x" style="font-size:16px" data-delatt="${a.id}">×</button></div>`).join("") || '<p class="muted small">No attachments.</p>'}</div>
+        <div id="atts">${attachmentsFor(t.id).map(a => `<div class="att">${a.url ? "🔗" : "📎"} <a ${a.url ? `href="${esc(a.url)}" target="_blank" rel="noopener"` : `href="${esc(a.data_url||"#")}" download="${esc(a.file_name)}"`}>${esc(a.file_name)}</a><span class="muted small">${a.url ? "link" : fmtSize(a.size_bytes)}</span><button class="x" style="font-size:16px" data-delatt="${esc(a.id)}">×</button></div>`).join("") || '<p class="muted small">No attachments.</p>'}</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
           <label class="btn sm">Attach file (≤1.5 MB)<input type="file" id="f_file" class="hidden"></label>
           <input class="inp" id="f_link" placeholder="…or paste a link / file path" style="flex:1;min-width:160px;padding:4px 8px"><button class="btn sm" data-act="addLink">Add link</button>
@@ -1353,11 +1478,11 @@ function openProject(id){
         <p class="muted small">${st.total} tasks · ${st.counts.completed} done · ${Math.round(st.progress*100)}% complete</p>
         <h4 class="sec">Tasks</h4>
         ${S.tasks.filter(t => t.project_id === id).sort((a,b) => (a.status==="completed") - (b.status==="completed") || byImportance(a, b)).map(t =>
-          `<div class="att" style="cursor:pointer" data-opentask="${t.id}"><span class="badge ${t.priority}">${t.priority}</span><span style="flex:1;${t.status==="completed"?"text-decoration:line-through;color:var(--muted)":""}">${esc(t.title)}</span><span class="muted small">${STATUS_LABEL[t.status]}</span></div>`).join("") || '<p class="muted small">No tasks yet.</p>'}
+          `<div class="att" style="cursor:pointer" data-opentask="${esc(t.id)}"><span class="badge ${t.priority}">${t.priority}</span><span style="flex:1;${t.status==="completed"?"text-decoration:line-through;color:var(--muted)":""}">${esc(t.title)}</span><span class="muted small">${STATUS_LABEL[t.status]}</span></div>`).join("") || '<p class="muted small">No tasks yet.</p>'}
         <button class="btn sm" data-act="taskInProject" style="margin-top:6px">+ Task in this project</button>
         <h4 class="sec">Notes</h4>
         <div style="display:flex;gap:8px;margin-bottom:8px"><textarea class="inp" id="f_note" placeholder="Add a note…" style="min-height:40px"></textarea><button class="btn" data-act="addNote">Add</button></div>
-        ${notesFor({project_id:id}).map(n => `<div class="note"><div class="when"><span>${fmtWhen(n.created_at)}</span><button class="x" style="font-size:14px" data-delnote="${n.id}">×</button></div>${esc(n.body)}</div>`).join("") || '<p class="muted small">No notes yet.</p>'}` : ""}
+        ${notesFor({project_id:id}).map(n => `<div class="note"><div class="when"><span>${fmtWhen(n.created_at)}</span><button class="x" style="font-size:14px" data-delnote="${esc(n.id)}">×</button></div>${esc(n.body)}</div>`).join("") || '<p class="muted small">No notes yet.</p>'}` : ""}
     </div>
     <div class="df">
       <button class="btn primary" data-act="saveProject">${isNew ? "Create project" : "Save"}</button>
