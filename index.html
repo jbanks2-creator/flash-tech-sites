@@ -57,6 +57,10 @@ html,body{margin:0;background:var(--bg);color:var(--text);font-size:14px}
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
 a{color:var(--accent)}
+/* visible focus ring everywhere, including the div-based cards and rows */
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.card:focus-visible,.hrow:focus-visible,.hitem:focus-visible,.pcard:focus-visible,.rcard:focus-visible,tr.row:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.tabs button:focus-visible{outline-offset:-3px}
 .hidden{display:none!important}
 
 /* persistent system banner above <main> — quota failures and data recovery live here,
@@ -263,8 +267,27 @@ details.grp .rows{margin-top:6px}
 .parsed{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px;font-size:11.5px;min-height:18px;color:var(--muted)}
 
 @media (max-width:1100px){ .home{grid-template-columns:1fr} }
+/* P1-4: every interactive control measured under 44x44 at 390px. Raise the hit area on
+   touch-sized viewports without changing the desktop density. */
+@media (max-width:900px), (pointer:coarse){
+  .tabs button,.btn,.chip,.seg button,select.inp,input.inp,.linkbtn{min-height:44px}
+  .btn,.chip{min-width:44px}
+  .linkbtn{display:inline-flex;align-items:center}
+  .x{min-width:44px;min-height:44px}
+  .iconbtn{width:44px;height:44px}
+  .chk{width:44px;height:44px}
+  .att a{min-height:44px;display:flex;align-items:center}
+  .drow input[type=color],.dnew input[type=color]{width:44px;height:44px}
+}
 @media (max-width:900px){
   .themes{grid-template-columns:1fr}
+  /* filter chips scroll sideways instead of wrapping to a second 44px row */
+  .filters{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+  .filters::-webkit-scrollbar{display:none}
+  /* + Project is reachable from the Projects view and Home; dropping it keeps the header
+     from eating another 44px row on a phone */
+  #newProject{display:none}
+  .quick{padding:6px 10px 0}
   .tabs{max-width:100%;overflow-x:auto;scrollbar-width:none}
   .tabs::-webkit-scrollbar{display:none}
   .tabs button{flex:none;padding:6px 11px}
@@ -282,14 +305,14 @@ details.grp .rows{margin-top:6px}
 <header>
   <div class="bar">
     <div class="brand">Task<span>App</span></div>
-    <nav class="tabs" id="tabs">
-      <button data-view="home">Home</button>
-      <button data-view="focus">Focus</button>
-      <button data-view="board">Board</button>
-      <button data-view="list">List</button>
-      <button data-view="projects">Projects</button>
-      <button data-view="research">Research</button>
-      <button data-view="settings">Settings</button>
+    <nav class="tabs" id="tabs" role="tablist" aria-label="Views">
+      <button data-view="home" role="tab" aria-selected="true">Home</button>
+      <button data-view="focus" role="tab" aria-selected="false">Focus</button>
+      <button data-view="board" role="tab" aria-selected="false">Board</button>
+      <button data-view="list" role="tab" aria-selected="false">List</button>
+      <button data-view="projects" role="tab" aria-selected="false">Projects</button>
+      <button data-view="research" role="tab" aria-selected="false">Research</button>
+      <button data-view="settings" role="tab" aria-selected="false">Settings</button>
     </nav>
     <div class="grow"></div>
     <input id="search" class="search" type="search" placeholder="Search tasks  ( / )">
@@ -303,7 +326,7 @@ details.grp .rows{margin-top:6px}
   <div class="filters" id="filters"></div>
 </header>
 <div id="banner" class="banner hidden" role="alert" aria-live="assertive"></div>
-<main id="main"></main>
+<main id="main" role="tabpanel" aria-label="Home view"></main>
 <div id="scrim" class="scrim hidden"></div>
 <aside id="drawer" class="drawer hidden"></aside>
 <input type="file" id="importFile" accept=".json,application/json" class="hidden">
@@ -407,9 +430,9 @@ function fmtWhen(iso){ const d = new Date(iso); return d.toLocaleDateString(unde
 function fmtSize(n){ return n < 1024 ? n+" B" : n < 1048576 ? (n/1024).toFixed(0)+" KB" : (n/1048576).toFixed(1)+" MB"; }
 function toast(msg, err=false){
   let box = document.getElementById("toasts");
-  if (!box) { box = document.createElement("div"); box.id = "toasts"; box.className = "toasts"; document.body.appendChild(box); }
+  if (!box) { box = document.createElement("div"); box.id = "toasts"; box.className = "toasts"; box.setAttribute("role", "status"); box.setAttribute("aria-live", "polite"); document.body.appendChild(box); }
   while (box.children.length >= 3) box.firstChild.remove();
-  const t = document.createElement("div"); t.className = "toast" + (err ? " err" : ""); t.textContent = msg;
+  const t = document.createElement("div"); t.className = "toast" + (err ? " err" : ""); t.setAttribute("role", err ? "alert" : "status"); t.textContent = msg;
   box.appendChild(t); setTimeout(() => t.remove(), err ? 4500 : 2200);
 }
 
@@ -774,7 +797,7 @@ function openDomains(){
   ui.drawer = {type:"domains"};
   const sc = $("#drawer .db")?.scrollTop || 0, wasOpen = !$("#drawer").classList.contains("hidden");
   openDrawer(`
-    <div class="dh"><h2>Domains</h2><button class="x" data-act="close">×</button></div>
+    <div class="dh"><h2>Domains</h2><button class="x" data-act="close" aria-label="Close panel">×</button></div>
     <div class="db">
       <p class="muted small" style="margin-top:0">Domains group your tasks, projects and research. Rename or recolor one by editing it here; use ↑ ↓ to change the order they appear in.</p>
       <div id="domEditor">${domainEditorHtml()}</div>
@@ -1200,8 +1223,15 @@ function parseDue(v){
 }
 
 /* ------------------------------------------------------------------ rendering */
+const VIEW_LABELS = {home:"Home", focus:"Focus", board:"Board", list:"List", projects:"Projects", research:"Research", settings:"Settings"};
 function render(){
-  $$("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.view === ui.view));
+  $$("#tabs button").forEach(b => {
+    const on = b.dataset.view === ui.view;
+    b.classList.toggle("on", on);
+    b.setAttribute("aria-selected", on ? "true" : "false");
+    b.tabIndex = on ? 0 : -1;                       // roving tabindex, arrow keys move between tabs
+  });
+  $("#main").setAttribute("aria-label", (VIEW_LABELS[ui.view] || ui.view) + " view");
   $("#quickWrap").classList.toggle("hidden", ui.view === "settings" || ui.view === "research" || ui.view === "home");
   renderFilters();
   const main = $("#main");
@@ -1211,8 +1241,8 @@ function renderFilters(){
   const f = $("#filters");
   if (ui.view === "settings") { f.innerHTML = ""; return; }
   const counts = {}; S.tasks.forEach(t => { if (!t.archived_at && t.status !== "completed") counts[t.domain_id] = (counts[t.domain_id]||0) + 1; });
-  f.innerHTML = `<button class="chip ${!ui.domain ? "on" : ""}" data-domain="">All</button>` +
-    sortedDomains().map(d => `<button class="chip ${ui.domain === d.id ? "on" : ""}" style="--c:${esc(d.color)}" data-domain="${esc(d.id)}"><span class="dot"></span>${esc(d.name)} <span class="muted">${counts[d.id]||0}</span></button>`).join("") +
+  f.innerHTML = `<button class="chip ${!ui.domain ? "on" : ""}" data-domain="" aria-pressed="${!ui.domain ? "true" : "false"}">All</button>` +
+    sortedDomains().map(d => `<button class="chip ${ui.domain === d.id ? "on" : ""}" style="--c:${esc(d.color)}" data-domain="${esc(d.id)}" aria-pressed="${ui.domain === d.id ? "true" : "false"}"><span class="dot"></span>${esc(d.name)} <span class="muted">${counts[d.id]||0}</span></button>`).join("") +
     `<button class="chip" data-act="manageDomains" title="Create, rename, recolor, reorder or delete domains">✎ Domains</button>` +
     (ui.view !== "projects" && ui.view !== "research" && ui.view !== "home" ? `<select class="inp" id="projFilter" style="width:auto;max-width:240px;padding:4px 8px;font-size:12px;border-radius:999px">
       <option value="">All projects</option><option value="__none" ${ui.project==="__none"?"selected":""}>No project</option>
@@ -1228,7 +1258,7 @@ function dueBadge(t){
 function cardHtml(t){
   const d = domainById(t.domain_id), p = t.project_id ? projectById(t.project_id) : null;
   const nNotes = S.notes.filter(n => n.task_id === t.id).length, nAtt = attachmentsFor(t.id).length;
-  return `<div class="card ${t.status==="completed"?"done":""}" data-id="${esc(t.id)}" style="--c:${esc(d?.color||"#888")}">
+  return `<div class="card ${t.status==="completed"?"done":""}" data-id="${esc(t.id)}" tabindex="0" role="button" aria-label="${esc(t.title)} — ${esc(STATUS_LABEL[t.status] || t.status)}, ${esc(t.priority)} priority" style="--c:${esc(d?.color||"#888")}">
     <div class="t">${esc(t.title)}</div>
     <div class="meta">
       <span class="badge ${t.priority}">${t.priority}</span>
@@ -1274,8 +1304,8 @@ function themePickerHtml(){
 const LONG_DATE = () => new Date().toLocaleDateString(undefined, {weekday:"long", month:"long", day:"numeric"});
 function hrowHtml(t){
   const d = domainById(t.domain_id), p = t.project_id ? projectById(t.project_id) : null, done = t.status === "completed";
-  return `<div class="hrow ${done ? "done" : ""}" data-id="${esc(t.id)}" style="--c:${esc(d?.color || "#888")}">
-    <button class="chk" data-done="${esc(t.id)}" title="${done ? "Mark not done" : "Mark done"}">✓</button>
+  return `<div class="hrow ${done ? "done" : ""}" data-id="${esc(t.id)}" tabindex="0" aria-label="${esc(t.title)} — ${esc(STATUS_LABEL[t.status] || t.status)}" style="--c:${esc(d?.color || "#888")}">
+    <button class="chk" data-done="${esc(t.id)}" aria-label="${done ? "Mark not done" : "Mark done"}: ${esc(t.title)}" title="${done ? "Mark not done" : "Mark done"}">✓</button>
     <span class="ht" title="${esc(t.title)}">${esc(t.title)}</span>
     <span class="meta">${t.status === "in_progress" && !done ? '<span class="badge hide-sm" style="color:var(--info-fg)">in progress</span>' : ""}${t.status === "blocked" ? '<span class="badge hide-sm" style="color:var(--danger-fg)">blocked</span>' : ""}<span class="badge ${t.priority}">${t.priority}</span>${dueBadge(t)}${p ? `<span class="badge hide-sm">▸ ${esc(p.name)}</span>` : ""}</span>
   </div>`;
@@ -1393,7 +1423,7 @@ function renderBoard(main){
   if (!S.tasks.length) { main.innerHTML = emptyHtml(); return; }
   main.innerHTML = `<div class="board">${STATUSES.map(([s,label]) => {
     const col = tasks.filter(t => t.status === s).sort((a,b) => a.position - b.position);
-    return `<section class="col" data-status="${s}"><h3>${label}<span class="n">${col.length}</span></h3>
+    return `<section class="col" data-status="${s}" role="region" aria-label="${esc(label)} — ${col.length} task${col.length === 1 ? "" : "s"}"><h3>${label}<span class="n">${col.length}</span></h3>
       <div class="list">${col.map(cardHtml).join("")}</div></section>`;
   }).join("")}</div>
   <p class="muted small" style="margin-top:14px">Drag cards between columns (on a phone: press and hold, then drag). Click a card to edit. <kbd>n</kbd> new task · <kbd>/</kbd> search · <kbd>t</kbd> theme · <kbd>Esc</kbd> close</p>`;
@@ -1406,7 +1436,7 @@ function renderList(main){
   const tasks = visibleTasks().filter(t => t.status !== "completed" || ui.q).sort(byImportance);
   if (!S.tasks.length) { main.innerHTML = emptyHtml(); return; }
   main.innerHTML = `<table><thead><tr><th>Task</th><th class="hide-sm">Domain</th><th class="hide-sm">Project</th><th>Status</th><th class="hide-sm">Priority</th><th>Due</th></tr></thead><tbody>
-    ${tasks.map(t => { const d = domainById(t.domain_id), p = projectById(t.project_id); return `<tr class="row" data-id="${esc(t.id)}">
+    ${tasks.map(t => { const d = domainById(t.domain_id), p = projectById(t.project_id); return `<tr class="row" data-id="${esc(t.id)}" tabindex="0">
       <td><b>${esc(t.title)}</b> ${t.recurrence!=="none"?"🔁":""}</td>
       <td class="hide-sm"><span class="dot" style="--c:${esc(d?.color)}"></span> ${esc(d?.name)}</td>
       <td class="hide-sm">${esc(p?.name || "—")}</td>
@@ -1445,7 +1475,7 @@ function renderFocus(main){
 function renderProjects(main){
   const ps = S.projects.filter(p => !ui.domain || p.domain_id === ui.domain).sort((a,b) => (a.status==="done") - (b.status==="done") || b.criticality - a.criticality || a.name.localeCompare(b.name));
   main.innerHTML = ps.length ? `<div class="grid">${ps.map(p => { const d = domainById(p.domain_id), st = projectStats(p.id); return `
-    <div class="pcard" data-pid="${esc(p.id)}" style="--c:${esc(d?.color)}">
+    <div class="pcard" data-pid="${esc(p.id)}" tabindex="0" role="button" aria-label="Project: ${esc(p.name)}" style="--c:${esc(d?.color)}">
       <h4>${esc(p.name)}</h4>
       <div class="meta"><span class="badge">${esc(d?.name)}</span><span class="badge" title="Criticality">${"★".repeat(p.criticality)}${"☆".repeat(5-p.criticality)}</span>
         ${p.status !== "active" ? `<span class="badge">${p.status.replace("_"," ")}</span>` : ""}${p.due_date ? `<span class="badge">📅 ${esc(fmtDue(p.due_date))}</span>` : ""}</div>
@@ -1460,7 +1490,7 @@ const levelDots = n => `<span class="lvl" title="Comfort: ${esc(LEVELS[n])} (${n
 function rcardHtml(r){
   const d = domainById(r.domain_id), open = topicTasks(r.id).filter(t => t.status !== "completed").length;
   const last = r.log.length ? r.log.map(e => e.created_at).sort().pop() : null;
-  return `<div class="rcard" data-rid="${esc(r.id)}" style="--c:${esc(d?.color || "#64748b")}">
+  return `<div class="rcard" data-rid="${esc(r.id)}" tabindex="0" role="button" aria-label="Research topic: ${esc(r.name)}" style="--c:${esc(d?.color || "#64748b")}">
     <h4>${esc(r.name)}</h4>
     <div class="meta"><span class="badge rs-${r.status}">${RSTATUS_LABEL[r.status]}</span>${levelDots(r.level)}
       ${r.tags.map(g => `<span class="badge tag">#${esc(g)}</span>`).join("")}</div>
@@ -1493,7 +1523,7 @@ function openTopic(id, mode){
   ui.mdMode = mode || (isNew || !r.body ? "edit" : "preview");
   const tasks = isNew ? [] : S.tasks.filter(t => t.research_id === id).sort((a,b) => (a.status==="completed") - (b.status==="completed") || byImportance(a, b));
   openDrawer(`
-    <div class="dh"><h2>${isNew ? "New research topic" : "Research topic"}</h2><button class="x" data-act="close">×</button></div>
+    <div class="dh"><h2>${isNew ? "New research topic" : "Research topic"}</h2><button class="x" data-act="close" aria-label="Close panel">×</button></div>
     <div class="db">
       <label class="f">Technology / topic<input class="inp" id="r_name" value="${esc(r.name)}" ${isNew ? "autofocus" : ""} placeholder="e.g. Kubernetes, Terraform, Go"></label>
       <div class="row2">
@@ -1583,6 +1613,7 @@ function renderSettings(main){
 
 /* ------------------------------------------------------------------ drawers */
 let lastOpener = null;
+function setOpener(el){ if (el && el !== document.body && document.contains(el)) lastOpener = el; }
 // Serialised form state, used for two things: the dirty check on close (P1-8) and nothing
 // else — it deliberately ignores file inputs, which cannot be restored.
 function drawerFormState(){
@@ -1596,7 +1627,7 @@ function drawerHasUnsavedChanges(){
 }
 function openDrawer(html, label){
   const d = $("#drawer"), wasOpen = !d.classList.contains("hidden");
-  if (!wasOpen) lastOpener = document.activeElement;
+  if (!wasOpen) setOpener(document.activeElement);
   d.innerHTML = html; d.classList.remove("hidden"); $("#scrim").classList.remove("hidden");
   d.setAttribute("role", "dialog");
   d.setAttribute("aria-modal", "true");
@@ -1631,7 +1662,7 @@ function openTask(id, preset={}){
   ui.drawer = {type:"task", id};
   const due = t.due_date || "", dueDate = due.slice(0,10), dueTime = due.length > 10 ? due.slice(11) : "";
   openDrawer(`
-    <div class="dh"><h2>${isNew ? "New task" : "Edit task"}</h2><button class="x" data-act="close">×</button></div>
+    <div class="dh"><h2>${isNew ? "New task" : "Edit task"}</h2><button class="x" data-act="close" aria-label="Close panel">×</button></div>
     <div class="db">
       <label class="f">Title<input class="inp" id="f_title" value="${esc(t.title)}" autofocus maxlength="500"></label>
       <label class="f">Description<textarea class="inp" id="f_desc">${esc(t.description)}</textarea></label>
@@ -1682,7 +1713,7 @@ function openProject(id){
   ui.drawer = {type:"project", id};
   const st = isNew ? null : projectStats(id);
   openDrawer(`
-    <div class="dh"><h2>${isNew ? "New project" : "Edit project"}</h2><button class="x" data-act="close">×</button></div>
+    <div class="dh"><h2>${isNew ? "New project" : "Edit project"}</h2><button class="x" data-act="close" aria-label="Close panel">×</button></div>
     <div class="db">
       <label class="f">Name<input class="inp" id="p_name" value="${esc(p.name)}" autofocus></label>
       <div class="row2">
@@ -1865,6 +1896,8 @@ document.addEventListener("click", e => {
   if (bd) { e.preventDefault(); if (bd.dataset.bannerDismiss === "backup") { try { sessionStorage.setItem("taskapp.nudgeDismissed", todayStr()); } catch (err) {} } clearBanner(bd.dataset.bannerDismiss); return; }
   const a = e.target.closest("[data-act]"); if (a) { e.preventDefault(); act(a.dataset.act, a); return; }
   if (justDragged) return;
+  // remember what opened the drawer, so focus can go back there on close (P1-3)
+  setOpener(e.target.closest(".card[data-id], .hrow[data-id], tr.row[data-id], .pcard[data-pid], .rcard[data-rid], .hitem[data-open-project], .hitem[data-open-topic], [data-opentask]"));
   const card = e.target.closest(".card[data-id]"); if (card) { openTask(card.dataset.id); return; }
   const row = e.target.closest("tr.row"); if (row && !e.target.closest("select")) { openTask(row.dataset.id); return; }
   const sb = e.target.closest("[data-showboard]"); if (sb) { e.stopPropagation(); ui.project = sb.dataset.showboard; ui.domain = null; ui.view = "board"; render(); return; }
@@ -1980,6 +2013,77 @@ document.addEventListener("keydown", e => {
   else if (e.key === "/") { e.preventDefault(); $("#search").focus(); }
   else if (e.key === "q") { e.preventDefault(); $("#quick").focus(); }
   else if (e.key === "t" && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); cycleTheme(); }
+});
+
+/* ------------------------------------------------------------------ keyboard operability
+   P1-3: the board was mouse/touch only. Cards are now focusable buttons; Enter/Space opens
+   the task and Ctrl+Arrow moves it between columns (left/right) or reorders it (up/down).
+   The drawer traps Tab and Escape still closes it; focus returns to whatever opened it. */
+function refocus(sel){ const el = document.querySelector(sel); if (el) { try { el.focus(); } catch (e) {} } }
+function reorderCard(t, delta){
+  const list = S.tasks.filter(x => x.status === t.status && !x.archived_at).sort((a, b) => a.position - b.position);
+  const i = list.findIndex(x => x.id === t.id), j = Math.max(0, Math.min(list.length - 1, i + delta));
+  if (i < 0 || i === j) return false;
+  list.splice(i, 1); list.splice(j, 0, t);
+  list.forEach((x, k) => { x.position = (k + 1) * 1024; });
+  t.updated_at = nowUtc();
+  return true;
+}
+function shiftCardStatus(t, dir){
+  const i = STATUSES.findIndex(([s]) => s === t.status), j = i + dir;
+  if (j < 0 || j >= STATUSES.length) return null;
+  setStatus(t, STATUSES[j][0], null);
+  return STATUSES[j][1];
+}
+document.addEventListener("keydown", e => {
+  if (!(e.target instanceof Element)) return;
+  if (e.target.closest("input,select,textarea,button,a")) return;      // native controls keep their keys
+  const card = e.target.closest(".board .card[data-id]");
+  const row = e.target.closest("tr.row[data-id], .hrow[data-id]");
+  const pcard = e.target.closest(".pcard[data-pid]");
+  const rcard = e.target.closest(".rcard[data-rid]");
+  if (card) {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openTask(card.dataset.id); return; }
+    if (e.ctrlKey && e.key.indexOf("Arrow") === 0) {
+      e.preventDefault();
+      const t = taskById(card.dataset.id); if (!t) return;
+      let msg = null;
+      if (e.key === "ArrowLeft" || e.key === "ArrowRight") { const to = shiftCardStatus(t, e.key === "ArrowRight" ? 1 : -1); if (!to) return; msg = `Moved to ${to}`; }
+      else if (!reorderCard(t, e.key === "ArrowDown" ? 1 : -1)) return;
+      commit(msg);
+      refocus(`.board .card[data-id="${CSS.escape(card.dataset.id)}"]`);
+      return;
+    }
+  }
+  if (row && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openTask(row.dataset.id); return; }
+  if (pcard && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openProject(pcard.dataset.pid); return; }
+  if (rcard && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openTopic(rcard.dataset.rid); return; }
+});
+// Keep Tab inside the open drawer.
+document.addEventListener("keydown", e => {
+  if (e.key !== "Tab") return;
+  const d = $("#drawer");
+  if (d.classList.contains("hidden")) return;
+  const f = $$("button,input,select,textarea,a[href],[tabindex]:not([tabindex='-1'])", d)
+    .filter(el => !el.disabled && el.offsetParent !== null);
+  if (!f.length) return;
+  const first = f[0], last = f[f.length - 1], a = document.activeElement;
+  if (!d.contains(a)) { e.preventDefault(); first.focus(); return; }
+  if (e.shiftKey && a === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && a === last) { e.preventDefault(); first.focus(); }
+});
+// Roving tabindex on the view tabs.
+$("#tabs").addEventListener("keydown", e => {
+  if (["ArrowLeft", "ArrowRight", "Home", "End"].indexOf(e.key) < 0) return;
+  const tabs = $$("#tabs button"), i = tabs.indexOf(document.activeElement);
+  if (i < 0) return;
+  e.preventDefault();
+  const j = e.key === "Home" ? 0 : e.key === "End" ? tabs.length - 1
+    : (i + (e.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+  ui.view = tabs[j].dataset.view;
+  localStorage.setItem("taskapp.view", ui.view);
+  render();
+  tabs[j].focus();
 });
 
 /* ------------------------------------------------------------------ drag and drop (mouse + touch) */
