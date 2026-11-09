@@ -887,6 +887,31 @@ function download(name, text, type="application/json"){
   a.href = URL.createObjectURL(new Blob([text], {type})); a.download = name;
   document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
 }
+const stamp = () => nowUtc().replace(/[:.]/g, "-");
+/* Import is destructive-ish (it merges a file into live data), so the current state is
+   written out as a file BEFORE the merge is persisted. If the merge then fails, the user
+   still has the file they needed. */
+function preImportBackup(state){
+  try {
+    download(`taskapp-pre-import-${stamp()}.json`, JSON.stringify(state, null, 2));
+    try { localStorage.setItem("taskapp.lastPreImport", nowUtc()); } catch (e) {}
+    return true;
+  } catch (e) { console.error("TaskApp: pre-import backup failed", e); return false; }
+}
+/* "Export backup now" nudge after N days without one. Non-blocking and dismissable for the
+   day; the data only exists in this browser, so silence is the wrong default. */
+const BACKUP_NUDGE_DAYS = 7;
+const hasUserData = () => !!(S.tasks.length || S.projects.length || S.research.length || S.notes.length || S.attachments.length);
+function daysSince(iso){ if (!iso) return Infinity; const t = new Date(iso).getTime(); return isFinite(t) ? (Date.now() - t) / 864e5 : Infinity; }
+function backupNudge(){
+  if (!hasUserData()) return;
+  const last = localStorage.getItem("taskapp.lastExport"), days = daysSince(last);
+  if (days < BACKUP_NUDGE_DAYS) return;
+  if (sessionStorage.getItem("taskapp.nudgeDismissed") === todayStr()) return;
+  showBanner("backup", "warn",
+    `<b>${last ? `No backup for ${Math.floor(days)} days.` : "You have not exported a backup yet."}</b> Your data lives only in this browser — clearing site data erases it.`,
+    [{ label: "Export a backup now", act: "export" }]);
+}
 /* Import is the one place the app accepts untrusted input. The whole file is validated
    against a schema before S is touched: every failure aborts with nothing changed. */
 const EXPORT_ARRAYS = ["domains","projects","tasks","notes","attachments","research","tags","task_tags"];
@@ -1703,7 +1728,7 @@ function act(name, el){
         ui.domDelete = null; refreshDomains(`Domain "${name}" deleted`); break; }
       case "export": {
         download(`taskapp-backup-${todayStr()}.json`, JSON.stringify(exportData(), null, 2));
-        localStorage.setItem("taskapp.lastExport", nowUtc()); render(); break; }
+        localStorage.setItem("taskapp.lastExport", nowUtc()); clearBanner("backup"); render(); break; }
       case "recoverDownload": {
         if (!RECOVERY) break;
         download(`taskapp-damaged-${RECOVERY.at.replace(/[:.]/g, "-")}.txt`, RECOVERY.raw, "text/plain");
@@ -1748,7 +1773,7 @@ $("#quick").addEventListener("keydown", e => {
 });
 document.addEventListener("click", e => {
   const bd = e.target.closest("[data-banner-dismiss]");
-  if (bd) { e.preventDefault(); clearBanner(bd.dataset.bannerDismiss); return; }
+  if (bd) { e.preventDefault(); if (bd.dataset.bannerDismiss === "backup") { try { sessionStorage.setItem("taskapp.nudgeDismissed", todayStr()); } catch (err) {} } clearBanner(bd.dataset.bannerDismiss); return; }
   const a = e.target.closest("[data-act]"); if (a) { e.preventDefault(); act(a.dataset.act, a); return; }
   if (justDragged) return;
   const card = e.target.closest(".card[data-id]"); if (card) { openTask(card.dataset.id); return; }
@@ -1839,10 +1864,22 @@ $("#importFile").addEventListener("change", e => {
   const file = e.target.files[0]; if (!file) return;
   const r = new FileReader();
   r.onload = () => {
-    const before = JSON.stringify(S);
-    try { const st = importData(JSON.parse(r.result)); if (save()) { render(); toast(`Imported: ${st.inserted} added, ${st.updated} updated, ${st.skipped} unchanged`); } else S = JSON.parse(before); }
-    catch (err) { S = JSON.parse(before); toast("Import failed: " + err.message, true); }
-    e.target.value = "";
+    const reset = () => { e.target.value = ""; };
+    let data;
+    try { data = JSON.parse(r.result); }
+    catch (err) { toast("Import failed — that file is not valid JSON. Nothing was changed.", true); return reset(); }
+    // Snapshot first, validate + stage in importData, back the snapshot up, then persist.
+    // importData() throws with nothing applied, so a bad file never reaches storage.
+    const preImport = exportData();
+    try {
+      const st = importData(data);
+      const backedUp = preImportBackup(preImport);
+      if (!save()) throw new Error("the import could not be written to storage, so it was rolled back");
+      localStorage.setItem("taskapp.lastImport", nowUtc());
+      render();
+      toast(`Imported: ${st.inserted} added, ${st.updated} updated, ${st.skipped} unchanged` + (backedUp ? " · pre-import backup downloaded" : " · backup could not be downloaded"));
+    } catch (err) { toast("Import failed: " + err.message, true); }
+    reset();
   };
   r.readAsText(file);
 });
@@ -1940,7 +1977,7 @@ document.addEventListener("contextmenu", e => { if (e.target.closest(".board .ca
 /* ------------------------------------------------------------------ start */
 updateThemeBtn();
 render();
-if (RECOVERY) showRecoveryBanner();
+if (RECOVERY) showRecoveryBanner(); else backupNudge();
 // refresh due-date labels when the day changes or the tab comes back
 let lastDay = todayStr();
 setInterval(() => { if (todayStr() !== lastDay) { lastDay = todayStr(); render(); } }, 60000);
