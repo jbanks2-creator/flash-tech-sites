@@ -177,6 +177,8 @@ h4.sec{margin:18px 0 8px;font-size:13px;color:var(--muted);text-transform:upperc
 
 .toasts{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:200;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;width:max-content;max-width:92vw}
 .toast{background:var(--card2);border:1px solid var(--border);padding:10px 16px;border-radius:8px;box-shadow:0 8px 20px var(--shadow)}
+.toast.act{pointer-events:auto;display:flex;gap:12px;align-items:center}
+.toast .undo{background:none;border:0;color:var(--accent);font-weight:600;text-decoration:underline;padding:2px 2px;min-height:24px}
 .toast.err{border-color:var(--over-bd);color:var(--danger-fg)}
 kbd{background:var(--card2);border:1px solid var(--border);border-bottom-width:2px;border-radius:4px;padding:0 5px;font-size:11px}
 
@@ -537,6 +539,7 @@ function save(){
   try {
     localStorage.setItem(STORE_KEY, json);
     SAVED_JSON = json;
+    if (undoEntry && !undoEntry.post) undoEntry.post = json;   // this save is the undo point
     clearBanner("save");
     if (json.length > QUOTA_WARN)
       showBanner("quota", "warn",
@@ -1740,8 +1743,50 @@ function openProject(id){
     </div>`, isNew ? "New project" : "Project: " + p.name);
 }
 
-/* ------------------------------------------------------------------ actions */
+/* ------------------------------------------------------------------ undo
+   P1-9: every destructive control either names what it will destroy (tasks, projects,
+   domains) or is reversible for 15 seconds (notes, links, log entries, attachments).
+   The snapshot is dropped as soon as anything else is saved, so Undo can never rewind an
+   unrelated later change. */
+let undoEntry = null, undoTimer = null;
+function beginUndo(label){
+  undoEntry = { label, json: JSON.stringify(S), post: null };
+  clearTimeout(undoTimer);
+  undoTimer = setTimeout(() => { undoEntry = null; }, 15000);
+}
+function undoLast(){
+  if (!undoEntry || !undoEntry.post || SAVED_JSON !== undoEntry.post) {
+    toast("Too late to undo — later changes were already saved", true); return;
+  }
+  const json = undoEntry.json, label = undoEntry.label;
+  undoEntry = null; clearTimeout(undoTimer);
+  try { S = JSON.parse(json); } catch (e) { return; }
+  if (!save()) return;
+  render();
+  // refresh an open drawer so the restored rows are actually visible
+  const d = ui.drawer;
+  if (d) {
+    if (d.type === "task") reopenTask(d.id);
+    else if (d.type === "project") openProject(d.id);
+    else if (d.type === "topic") reopenTopic(d.id);
+    else if (d.type === "domains") openDomains();
+  }
+  toast(`Restored ${label}`);
+}
+function toastAction(msg, label, fn, ms = 15000){
+  let box = document.getElementById("toasts");
+  if (!box) { box = document.createElement("div"); box.id = "toasts"; box.className = "toasts"; box.setAttribute("role", "status"); box.setAttribute("aria-live", "polite"); document.body.appendChild(box); }
+  while (box.children.length >= 3) box.firstChild.remove();
+  const t = document.createElement("div"); t.className = "toast act";
+  const span = document.createElement("span"); span.textContent = msg;
+  const b = document.createElement("button"); b.type = "button"; b.className = "undo"; b.textContent = label;
+  b.addEventListener("click", () => { t.remove(); fn(); });
+  t.append(span, b); box.appendChild(t);
+  setTimeout(() => t.remove(), ms);
+}
+const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
 function commit(msg){ if (save()) { render(); if (msg) toast(msg); } }
+function commitDelete(msg){ if (save()) { render(); toastAction(msg, "Undo", undoLast); } }
 function act(name, el){
   const d = ui.drawer;
   try {
@@ -1766,7 +1811,12 @@ function act(name, el){
         else { updateTask(d.id, f); commit("Saved"); closeDrawer(); }
         break; }
       case "completeTask": updateTask(d.id, {...readTaskForm(), status:"completed"}); commit("Done ✓"); closeDrawer(); break;
-      case "deleteTask": if (confirm("Delete this task, its notes and attachments?")) { deleteTask(d.id); commit("Task deleted"); closeDrawer(); } break;
+      case "deleteTask": {
+        const t = taskById(d.id); if (!t) break;
+        const nn = S.notes.filter(n => n.task_id === t.id).length, na = S.attachments.filter(a => a.task_id === t.id).length;
+        const extra = [nn ? plural(nn, "note") : "", na ? plural(na, "attachment") : ""].filter(Boolean).join(" and ");
+        if (!confirm(`Delete “${t.title}”?${extra ? ` This also deletes ${extra}.` : ""} You can undo for 15 seconds.`)) break;
+        beginUndo("the task"); deleteTask(t.id); commitDelete("Task deleted — Undo"); closeDrawer(); break; }
       case "addNote": {
         const owner = d.type === "task" ? {task_id:d.id} : {project_id:d.id};
         if (!$("#f_note").value.trim()) return;
@@ -1782,7 +1832,11 @@ function act(name, el){
         const f = readProjectForm();
         if (!d.id) createProject(f); else updateProject(d.id, f);
         commit(d.id ? "Project saved" : "Project created"); closeDrawer(); break; }
-      case "deleteProject": if (confirm("Delete this project? Its tasks are kept as standalone tasks.")) { deleteProject(d.id); commit("Project deleted"); closeDrawer(); } break;
+      case "deleteProject": {
+        const p = projectById(d.id); if (!p) break;
+        const kept = S.tasks.filter(t => t.project_id === p.id).length, notes = S.notes.filter(n => n.project_id === p.id).length;
+        if (!confirm(`Delete project “${p.name}”? ${plural(kept, "task")} will be kept as standalone tasks${notes ? `, and ${plural(notes, "note")} will be deleted` : ""}. You can undo for 15 seconds.`)) break;
+        beginUndo("the project"); deleteProject(p.id); commitDelete("Project deleted — Undo"); closeDrawer(); break; }
       case "newTopic": openTopic(null); break;
       case "entryType": ui.entryType = el.dataset.type; localStorage.setItem("taskapp.entryType", ui.entryType); render(); focusEntry(); break;
       case "entryDetails": { const q = parseQuick($("#e_task").value); $("#e_task").value = ""; openTask(null, {...q, title: q.title || "", domain_id: q.domain_id || (q.project_id ? projectById(q.project_id).domain_id : fallbackDomain(ui.domain || "personal"))}); break; }
@@ -1812,7 +1866,12 @@ function act(name, el){
         else { updateTopic(d.id, readTopicForm()); commit("Topic saved"); closeDrawer(); }
         break; }
       case "deleteTopic":
-        if (confirm("Delete this research topic, its notes, links and study log? Linked tasks are kept.")) { deleteTopic(d.id); commit("Topic deleted"); closeDrawer(); }
+        if (!d.id) break;
+        { const r = researchById(d.id); if (!r) break;
+          const lost = plural(r.links.length, "link") + ", " + plural(r.log.length, "study-log entry") + " and its notes";
+          if (confirm(`Delete research topic “${r.name}”? This deletes ${lost}. Linked tasks are kept. You can undo for 15 seconds.`)) {
+            beginUndo("the topic"); deleteTopic(d.id); commitDelete("Topic deleted — Undo"); closeDrawer();
+          } }
         break;
       case "mdMode": {
         ui.mdMode = el.dataset.mode;
@@ -1844,8 +1903,9 @@ function act(name, el){
       case "domDeleteCancel": ui.domDelete = null; refreshDomains(); break;
       case "domDeleteConfirm": {
         const id = ui.domDelete, name = domainById(id)?.name;
+        beginUndo("the domain");
         deleteDomain(id, $("#domTarget")?.value);
-        ui.domDelete = null; refreshDomains(`Domain "${name}" deleted`); break; }
+        ui.domDelete = null; refreshDomains(); toastAction(`Domain “${name}” deleted — Undo`, "Undo", undoLast); break; }
       case "export": {
         download(`taskapp-backup-${todayStr()}.json`, JSON.stringify(exportData(), null, 2));
         localStorage.setItem("taskapp.lastExport", nowUtc()); clearBanner("backup"); render(); break; }
@@ -1918,9 +1978,11 @@ document.addEventListener("click", e => {
   const rs = e.target.closest("[data-rstatus]"); if (rs) { ui.rstatus = rs.dataset.rstatus; render(); return; }
   const ot = e.target.closest("[data-opentask]"); if (ot) { openTask(ot.dataset.opentask); return; }
   const dl = e.target.closest("[data-dellink]");
-  if (dl) { try { const r = updateTopic(ui.drawer.id, readTopicForm()); r.links = r.links.filter(l => l.id !== dl.dataset.dellink); r.updated_at = nowUtc(); save(); render(); reopenTopic(r.id); } catch (err) { toast(err.message, true); } return; }
+  if (dl) { try { beginUndo("the link"); const r = updateTopic(ui.drawer.id, readTopicForm()); r.links = r.links.filter(l => l.id !== dl.dataset.dellink); r.updated_at = nowUtc();
+      if (save()) { render(); reopenTopic(r.id); toastAction("Link removed", "Undo", undoLast); } } catch (err) { toast(err.message, true); } return; }
   const dg = e.target.closest("[data-dellog]");
-  if (dg) { if (confirm("Delete this study log entry?")) { try { const r = updateTopic(ui.drawer.id, readTopicForm()); r.log = r.log.filter(x => x.id !== dg.dataset.dellog); r.updated_at = nowUtc(); save(); render(); reopenTopic(r.id); } catch (err) { toast(err.message, true); } } return; }
+  if (dg) { try { beginUndo("the log entry"); const r = updateTopic(ui.drawer.id, readTopicForm()); r.log = r.log.filter(x => x.id !== dg.dataset.dellog); r.updated_at = nowUtc();
+      if (save()) { render(); reopenTopic(r.id); toastAction("Study-log entry deleted", "Undo", undoLast); } } catch (err) { toast(err.message, true); } return; }
   const f = e.target.closest("[data-focus]");
   if (f) {
     const id = f.dataset.id, k = f.dataset.focus;
@@ -1930,9 +1992,12 @@ document.addEventListener("click", e => {
     return;
   }
   const dn = e.target.closest("[data-delnote]");
-  if (dn) { S.notes = S.notes.filter(n => n.id !== dn.dataset.delnote); save(); render(); ui.drawer.type === "task" ? reopenTask(ui.drawer.id) : openProject(ui.drawer.id); return; }
+  if (dn) { beginUndo("the note"); S.notes = S.notes.filter(n => n.id !== dn.dataset.delnote);
+    if (save()) { render(); if (ui.drawer) (ui.drawer.type === "task" ? reopenTask(ui.drawer.id) : openProject(ui.drawer.id)); toastAction("Note deleted", "Undo", undoLast); }
+    return; }
   const da = e.target.closest("[data-delatt]");
-  if (da && confirm("Remove this attachment?")) { S.attachments = S.attachments.filter(x => x.id !== da.dataset.delatt); save(); render(); reopenTask(ui.drawer.id); }
+  if (da) { beginUndo("the attachment"); S.attachments = S.attachments.filter(x => x.id !== da.dataset.delatt);
+    if (save()) { render(); reopenTask(ui.drawer.id); toastAction("Attachment removed", "Undo", undoLast); } }
 });
 document.addEventListener("change", e => {
   if (e.target.id === "rtagFilter") { ui.rtag = e.target.value; render(); return; }
