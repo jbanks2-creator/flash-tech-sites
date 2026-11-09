@@ -23,8 +23,24 @@ function log(name, data) {
 
 const browser = await chromium.launch({
   executablePath: EXEC,
-  args: ["--no-sandbox", "--disable-dev-shm-usage"],
+  // Memory discipline: the box is 7.9 GB and an unconstrained Chromium took the
+  // gateway down twice (OOM kill). These flags keep one probe under ~1 GB; the
+  // caller additionally wraps this in a memory cgroup (MemoryMax=1536M).
+  args: [
+    "--no-sandbox",
+    "--disable-dev-shm-usage",
+    "--disable-gpu",
+    "--no-zygote",
+    "--renderer-process-limit=1",
+    "--js-flags=--max-old-space-size=512",
+    "--disable-background-timer-throttling",
+    "--disable-extensions",
+  ],
 });
+console.log("### launch_args\n" + JSON.stringify([
+  "--no-sandbox","--disable-dev-shm-usage","--disable-gpu","--no-zygote",
+  "--renderer-process-limit=1","--js-flags=--max-old-space-size=512",
+]));
 
 async function newPage(url = TARGET) {
   const ctx = await browser.newContext();
