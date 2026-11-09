@@ -263,14 +263,17 @@ if (ONLY === "all" || ONLY === "import") {
   const attrXss = await page.evaluate(() => {
     window.__xss = 0;
     S = blankState();
-    importData({
-      format: "taskapp-export", version: 1,
-      domains: [{ id: "business", name: "Business" }],
-      tasks: [{ id: `a"><img src=x onerror="window.__xss=77">`, title: "attr", domain_id: "business", status: "todo", priority: "medium", recurrence: "none", recurrence_interval: 1, tags: [], created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z" }],
-    });
+    let threw = null;
+    try {
+      importData({
+        format: "taskapp-export", version: 1,
+        domains: [{ id: "business", name: "Business" }],
+        tasks: [{ id: `a"><img src=x onerror="window.__xss=77">`, title: "attr", domain_id: "business", status: "todo", priority: "medium", recurrence: "none", recurrence_interval: 1, tags: [], created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z" }],
+      });
+    } catch (e) { threw = String(e.message).split("\n")[0]; }
     ui.view = "board"; render();
     const injected = [...document.querySelectorAll("#main img")].map((i) => i.getAttribute("onerror"));
-    return { xss: window.__xss, injectedImgs: injected };
+    return { threw, xss: window.__xss, injectedImgs: injected };
   });
   log("import_attribute_xss", attrXss);
   await ctx.close();
