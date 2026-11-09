@@ -57,7 +57,7 @@ unchanged, so existing data loads as-is.**
 print, help, licence and offline; all pass. The full hardening suite (XSS, silent writes,
 corrupt store, import/backup, product surface, a11y, undo, CSP, scale, file://) still
 passes, unchanged. `dist/TaskApp-1.0.0-rc.1.html` boots over `file://` with the demo and
-persists across reload; its sha256 (`b148c912…`) matches the bytes served on
+persists across reload; its sha256 (`de268211…`) matches the bytes served on
 `127.0.0.1:3601` and by an independent HTTP server.
 
 ### Still out of scope
