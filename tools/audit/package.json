@@ -1,0 +1,12 @@
+{
+  "name": "taskapp-audit",
+  "private": true,
+  "type": "module",
+  "description": "Readiness probe for TaskApp. Drives the real page in headless Chromium (playwright-core) and prints evidence for docs/readiness-audit.md.",
+  "scripts": {
+    "probe": "node probe.mjs http://127.0.0.1:3601/ all"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.56.0"
+  }
+}
