@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-C1ragFL4qO1xRsx2YWNY3bWj3bFTjO9OAvmQjQ+/1KA=' 'sha256-t+338JgnKIc/WebPIh4HZ3lh9dACjw8JjhT5I9twtmo='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'none'; base-uri 'none'; object-src 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-C1ragFL4qO1xRsx2YWNY3bWj3bFTjO9OAvmQjQ+/1KA=' 'sha256-aQzMOSwBGqo68yL8zwERGijmzCAZ4p2NpuHkudeOhgE='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'none'; base-uri 'none'; object-src 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>TaskApp — tasks, projects and clients</title>
 <meta name="description" content="A task, project and client manager in one HTML file. No account, no cloud, no network: your data never leaves this device.">
@@ -1151,28 +1151,37 @@ function importData(data){
     if (name.length > 40) { fail(where, "name is longer than 40 characters"); continue; }
     const fields = {
       name,
-      weight: Number.isFinite(d.weight) ? d.weight : 1,
-      color: /^#[0-9a-fA-F]{6}$/.test(d.color || "") ? d.color : "#6b7280",
+      weight: Number.isFinite(d.weight) ? d.weight : null,
+      color: /^#[0-9a-fA-F]{6}$/.test(d.color || "") ? d.color : null,
       sort_order: Number.isInteger(d.sort_order) ? d.sort_order : null,
     };
     const existing = next.domains.find(x => x.id === d.id);
     if (existing) {
       domainTouched.add(existing.id);
-      if (fields.sort_order === null) fields.sort_order = existing.sort_order;
-      const changed = ["name","weight","color","sort_order"].some(k => fields[k] !== existing[k]);
+      // A field the file leaves out is a field this file has no opinion about: keep the
+      // local value rather than resetting a colour or weight to the insert default.
+      const incoming = {
+        name,
+        weight: fields.weight === null ? existing.weight : fields.weight,
+        color: fields.color === null ? existing.color : fields.color,
+        sort_order: fields.sort_order === null ? existing.sort_order : fields.sort_order,
+      };
+      const changed = ["name","weight","color","sort_order"].some(k => incoming[k] !== existing[k]);
       const fileStamp = typeof d.updated_at === "string" ? d.updated_at : "";
       const localStamp = typeof existing.updated_at === "string" ? existing.updated_at : "";
       const newer = !fileStamp || !localStamp || fileStamp >= localStamp;
-      if (changed && newer) { Object.assign(existing, fields, {updated_at: nowUtc()}); st.updated++; }
+      if (changed && newer) { Object.assign(existing, incoming, {updated_at: nowUtc()}); st.updated++; }
       else st.skipped++;
       continue;
     }
     const clash = next.domains.find(x => x.name.toLowerCase() === name.toLowerCase() && !domainTouched.has(x.id))
                || next.domains.find(x => x.name.toLowerCase() === name.toLowerCase());
     if (clash) { domainRemap.set(d.id, clash.id); st.merged++; continue; }
-    if (fields.sort_order === null)
-      fields.sort_order = Math.max(0, ...next.domains.map(x => x.sort_order || 0)) + 1;
-    next.domains.push(Object.assign({}, d, {id: d.id}, fields));   // keeps extra keys such as `demo`
+    next.domains.push(Object.assign({}, d, {id: d.id, name,
+      weight: fields.weight === null ? 1 : fields.weight,
+      color: fields.color === null ? "#6b7280" : fields.color,
+      sort_order: fields.sort_order === null ? Math.max(0, ...next.domains.map(x => x.sort_order || 0)) + 1 : fields.sort_order,
+    }));   // keeps extra keys such as `demo`
     st.inserted++;
   }
   if (pristine) {

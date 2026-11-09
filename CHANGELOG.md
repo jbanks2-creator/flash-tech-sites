@@ -42,7 +42,7 @@ a backup written by rc.1 restores here.
 
 ### Verified
 
-- `tools/audit/restore-domains-probe.mjs` — 31 assertions covering B1 (rename, colour,
+- `tools/audit/restore-domains-probe.mjs` — 34 assertions covering B1 (rename, colour,
   order), B2 (the exact QA repro through the UI, plus a real merge collision across tasks,
   projects and research), m1, demo flags surviving a restore, self-import as a no-op,
   six hostile domain fixtures and the stale-timestamp guard.

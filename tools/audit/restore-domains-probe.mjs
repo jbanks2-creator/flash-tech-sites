@@ -316,6 +316,26 @@ const envelope = (rows) => ({ format: "taskapp-export", version: 1, app_version:
   checks.R7_newer_file_wins = afterNewer === "File Newer";
 }
 
+/* ============ R8 — a field the file omits is kept, not reset to a default ============ */
+{
+  const a = await fresh("empty");
+  await a.page.evaluate(() => {
+    const d = S.domains.find((x) => x.id === "business");
+    d.color = "#aa00bb"; d.weight = 1.7; save(); render();
+  });
+  const minimal = envelope({ domains: [{ id: "business", name: "Business" }], tasks: [task("m1", "minimal row", "business")] });
+  const r = await importBuf(a.page, "minimal.json", minimal);
+  const after = await a.page.evaluate(() => {
+    const d = S.domains.find((x) => x.id === "business");
+    return { name: d.name, color: d.color, weight: d.weight, sort_order: d.sort_order, tasks: S.tasks.length };
+  });
+  await a.ctx.close();
+  log("R8-omitted-fields-kept", { toast: r.toast, after });
+  checks.R8_colour_kept = after.color === "#aa00bb";
+  checks.R8_weight_kept = after.weight === 1.7;
+  checks.R8_import_succeeds = /^Imported:/.test(r.toast) && after.tasks === 1;
+}
+
 /* ================================== verdict ================================== */
 const failed = Object.entries(checks).filter(([, v]) => !v).map(([k]) => k);
 fs.writeFileSync(path.join(OUT, "restore-domains-results.json"), JSON.stringify({ checks, results }, null, 2));
