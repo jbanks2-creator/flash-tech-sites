@@ -39,13 +39,26 @@ Consequences a buyer must understand before relying on it:
 
 ## What a buyer gets
 
-`bash scripts/build.sh` produces, in `dist/`:
+`bash scripts/build.sh` produces `dist/` — **one version, one README, one checksum**: the
+three files that get zipped and sold, and nothing else.
 
 | File | Purpose |
 |---|---|
 | `TaskApp-<version>.html` | the entire app, readable (deliberately not minified — a buyer can see what they installed) |
 | `TaskApp-<version>.html.sha256` | `sha256sum -c` format |
 | `README.txt` | the first file to read: how to open it, where data lives, backup, support, licence |
+
+The storefront ships **1.0.0-rc.3**, which is what sits at the top of `dist/`. Older
+releases are kept under `dist/archive/<version>/` with *their own* `README.txt` and
+`.sha256` — `bash scripts/build-archive.sh <version> <git-rev>` rebuilds one from history
+(`1.0.0-rc.2` from `7b7bfef`). That separation is the point: an old html beside a new
+README, or a README promising a feature the file next to it does not have, is how a buyer
+ends up with documentation for a different build.
+
+`bash scripts/check-dist.sh` asserts the whole tree: every `TaskApp-<version>.html` has a
+sibling README naming that version (and no other) and a `.sha256` that verifies, the file's
+own `APP_VERSION` matches its name, and no README describes a feature its build lacks.
+`build.sh` runs it after installing, so a build cannot leave `dist/` incoherent.
 
 Building twice produces byte-identical files and therefore the same checksum; the build
 script proves it every run (it builds into two directories and compares every output).
@@ -142,12 +155,12 @@ Everything else (file picker, status in Settings → About, persistence under
 
 ## Versioning
 
-`APP_VERSION` is what a buyer sees: shown in the header (`v1.0.0-rc.2`), in Settings →
+`APP_VERSION` is what a buyer sees: shown in the header (`v1.0.0-rc.3`), in Settings →
 About, and written into every export. It must equal `VERSION` — the build fails otherwise.
 
 | Here | Jay's label |
 |---|---|
-| `1.0.0-rc.2` (`VERSION`) | "TaskApp V4" + hardening + productisation + backup-restore fix (QA B1/B2/m1) |
+| `1.0.0-rc.3` (`VERSION`) | "TaskApp V4" + hardening + productisation + backup-restore fix (QA B1/B2/m1) + QA minors m2–m6 |
 
 `V4` was Jay's own iteration label on the original upload; this repo starts a proper
 semver line at `1.0.0-beta.1` and the first commit kept the V4 file byte-identical
@@ -157,7 +170,7 @@ Three numbers are deliberately separate:
 
 | Number | Meaning | Current |
 |---|---|---|
-| `APP_VERSION` | what a buyer has | `1.0.0-rc.2` |
+| `APP_VERSION` | what a buyer has | `1.0.0-rc.3` |
 | export `version` | shape of the JSON file | `1` |
 | `STORE_KEY` / `version` | shape of the stored blob | `taskapp.v1` / `1` |
 
@@ -194,7 +207,15 @@ The build validates before it copies: `VERSION` is semver and matches `APP_VERSI
 CSP hash matches the inline script; embedded demo data matches `demo-data.json`; no
 external script/style/image/font/`@import`. It then writes the three dist files, builds a
 second copy and `cmp`s every output, and verifies the `.sha256`. No date, hostname, git
-hash or counter enters any output — that is what keeps the checksum stable.
+hash or counter enters any output — that is what keeps the checksum stable. Installing
+replaces the previous release's files at the top of `dist/` but leaves `dist/archive/`
+alone, and the last step is `scripts/check-dist.sh`, which fails the build if any html in
+the tree lacks a matching README or checksum.
+
+```bash
+bash scripts/build-archive.sh 1.0.0-rc.2 7b7bfef   # keep an old release as its own drop
+bash scripts/check-dist.sh                          # verify every drop in dist/ and archive/
+```
 
 ## Tests
 
@@ -242,6 +263,8 @@ VERSION                     1.0.0-rc.3
 LICENSE                     licence-not-sale statement, points at the EULA
 CHANGELOG.md                what changed, per version
 scripts/build.sh            dist artifact + checksum + README.txt (deterministic)
+scripts/build-archive.sh    an old release into dist/archive/<version>/ with its own README
+scripts/check-dist.sh       asserts every html in dist/ has its own README + verifying .sha256
 scripts/embed-demo.mjs      keeps embedded DEMO_DATA identical to demo-data.json
 scripts/README.dist.txt     template for the buyer-facing README.txt
 compose.yaml                nginx static serve, no ports
@@ -249,7 +272,8 @@ compose.dev.yaml            dev override: 127.0.0.1:3601
 nginx/default.conf          static config
 tools/audit/                headless probes and the CSP hash checker (not shipped)
 tools/dev/serve-refresh.sh  recreate the container after editing index.html
-dist/                       build output (gitignored)
+dist/                       the current release drop (gitignored): html + .sha256 + README.txt
+dist/archive/<version>/     superseded releases, each with its own README.txt and .sha256
 ```
 
 `tools/`, `scripts/` and `dist/` are development and distribution machinery. The product

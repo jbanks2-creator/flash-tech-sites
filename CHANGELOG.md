@@ -64,6 +64,26 @@ and export format v1 are unchanged**, so backups from rc.1 and rc.2 restore here
   (`bytes_identical: true`), `qa-mobile2` (all seven tabs on screen at 375, `scrollWidth`
   375 in Board and List), plus `qa-rt`, `qa-sec`, `qa-sec2`, `qa-ux`, `qa-final`.
 
+### Packaging
+
+- **`dist/` is one coherent drop per version.** It used to hold `TaskApp-1.0.0-rc.2.html`
+  beside rc.3's `README.txt` and `.sha256`, so zipping the folder would have given a buyer
+  documentation and a checksum filename for a build they did not receive — and
+  `build.sh`'s `rm -rf dist/` dropped whichever version it had not just rebuilt. The
+  current release now sits at the top of `dist/` (rc.3: html, `.sha256`, README) and rc.2
+  moved to `dist/archive/1.0.0-rc.2/` with its **own** README, rendered from
+  `scripts/README.dist.txt` as it stood at `7b7bfef`, so it does not carry this release's
+  reproducible-export or two-tab paragraphs; one sentence in it is corrected to the
+  Chromium-only browser claim, which was never true of rc.2 either.
+- `scripts/build-archive.sh <version> <git-rev>` rebuilds an archived release from history
+  (extracting the html from the revision whose `index.html` produced it, plus that
+  revision's README template), so the archive is reproducible rather than hand-copied.
+- `scripts/check-dist.sh` enforces the rule across `dist/` and `dist/archive/`: every html
+  has a sibling README naming that version and no other, a `.sha256` that verifies, an
+  `APP_VERSION` matching its filename, and no README describing a feature its build lacks.
+  `build.sh` runs it as its last step, and now installs into `dist/` instead of wiping it.
+  The product file is unchanged by any of this.
+
 ## [1.0.0-rc.2] — 2026-11-09
 
 Backup restore, fixed. The two blockers and one minor from the independent hostile-buyer QA

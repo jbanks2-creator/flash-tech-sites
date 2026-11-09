@@ -3,11 +3,17 @@
 #
 #   bash scripts/build.sh
 #
-# Produces, in dist/:
+# Produces, in dist/ (the current release drop — exactly one version, the files a buyer
+# receives; dist/archive/<version>/ may hold older releases, each with its own README.txt
+# and .sha256 written by scripts/build-archive.sh):
 #   TaskApp-<version>.html            the whole app, one readable file (no minification:
 #                                     a buyer who wants to inspect what they bought can)
 #   TaskApp-<version>.html.sha256     sha256sum -c format
 #   README.txt                        the first file the buyer should read
+#
+# A build retires the previous release's files from the top of dist/ and leaves
+# dist/archive/ alone, so rebuilding never pairs one version's html with another
+# version's README. scripts/check-dist.sh then asserts the whole drop is coherent.
 #
 # The build is deliberately boring: it validates, then copies bytes. It must be
 # deterministic — building twice has to produce identical checksums — so no dates,
@@ -63,21 +69,39 @@ build_into() {
   ( cd "$out" && sha256sum "$NAME" > "$NAME.sha256" )
 }
 
-rm -rf "$DIST"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
-build_into "$DIST"
+build_into "$TMP/build1"
 build_into "$TMP/build2"
 
 # ---- 4. prove it is reproducible ----------------------------------------------
 for f in "$NAME" "$NAME.sha256" "README.txt"; do
-  cmp -s "$DIST/$f" "$TMP/build2/$f" || fail "second build produced a different $f — the build is not reproducible"
+  cmp -s "$TMP/build1/$f" "$TMP/build2/$f" || fail "second build produced a different $f — the build is not reproducible"
 done
 say "reproducible: two independent builds are byte-identical"
 
-# ---- 5. the checksum file verifies ---------------------------------------------
+# ---- 5. install it as *the* current release drop -------------------------------
+# dist/ is what gets zipped and sold, so the top level holds exactly one version: retire
+# the previous release's files, then copy this build in. dist/archive/ is deliberately
+# untouched — older versions live there with their own README and .sha256, and deleting
+# them (or leaving an old html behind beside this README) is the packaging bug this
+# layout exists to prevent.
+mkdir -p "$DIST"
+shopt -s nullglob
+for old in "$DIST"/TaskApp-*.html "$DIST"/TaskApp-*.html.sha256 "$DIST"/README.txt; do
+  rm -f "$old"
+done
+for f in "$NAME" "$NAME.sha256" "README.txt"; do
+  cp "$TMP/build1/$f" "$DIST/$f"
+done
+say "installed: dist/ now holds ${VERSION} as the release drop (archive/ untouched)"
+
+# ---- 6. the checksum file verifies ---------------------------------------------
 ( cd "$DIST" && sha256sum -c "$NAME.sha256" >/dev/null ) || fail "the .sha256 file does not verify"
 SUM="$(cut -d' ' -f1 "$DIST/$NAME.sha256")"
+
+# ---- 7. the whole drop is coherent, not just this build ------------------------
+bash scripts/check-dist.sh
 
 echo
 printf 'Built %s (%s bytes)\n' "$DIST/$NAME" "$(wc -c < "$DIST/$NAME")"
