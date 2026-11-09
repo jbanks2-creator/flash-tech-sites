@@ -15,7 +15,12 @@
 #   * a README cannot promise a feature the build beside it does not have (the checks
 #     below cover the two paragraphs rc.3 added: reproducible exports, two-tab notice);
 #   * nothing is orphaned: no README.txt or .sha256 without its html, and an archive
-#     directory is named after the version it holds.
+#     directory is named after the version it holds (and holds it: an archive directory
+#     with no TaskApp-<version>.html in it fails, so the summary's archive count cannot
+#     count an empty directory);
+#   * every html is found, at any depth — the scan is `find dist -name '*.html'`, so an
+#     html nested somewhere unexpected fails instead of being skipped, and the summary
+#     counts archive directories from find rather than a glob that can vanish.
 #
 # Exits 0 only if every check on every file passed. No network, no git, no build needed.
 set -euo pipefail
@@ -27,7 +32,10 @@ ok()   { printf '  ok   %s\n' "$*"; }
 [[ -d dist ]] || fail "dist/ does not exist — run: bash scripts/build.sh"
 
 shopt -s nullglob
-htmls=(dist/*.html dist/archive/*/*.html)
+# Enumerate with find, not a glob: a glob that matches nothing disappears under
+# nullglob, which is how a later `ls -d dist/archive/*/` came to list `.` and report
+# one archive when there were none. find always reports what is on disk.
+mapfile -t htmls < <(find dist -type f -name '*.html' | sort)
 [[ ${#htmls[@]} -gt 0 ]] || fail "dist/ holds no TaskApp html"
 
 checked=0
@@ -37,7 +45,15 @@ for html in "${htmls[@]}"; do
   [[ "$base" =~ ^TaskApp-(.+)\.html$ ]] || fail "$html is not named TaskApp-<version>.html"
   version="${BASH_REMATCH[1]}"
 
-  # 0. an archive directory is named after the version it holds
+  # 0a. an html may sit only at the top of dist/ or directly inside dist/archive/<version>/
+  #    (find sees every html at any depth; this fails the ones the old
+  #    dist/*.html + dist/archive/*/*.html globs silently missed)
+  rel="${html#dist/}"
+  if [[ "$rel" == */* && ! "$rel" =~ ^archive/[^/]+/[^/]+$ ]]; then
+    fail "$html sits somewhere unexpected — an html belongs at dist/<name>.html or dist/archive/<version>/<name>.html"
+  fi
+
+  # 0b. an archive directory is named after the version it holds
   if [[ "$dir" == dist/archive/* ]]; then
     [[ "$(basename "$dir")" == "$version" ]] \
       || fail "$html sits in archive/$(basename "$dir")/ — the directory must be named ${version}"
@@ -93,13 +109,26 @@ for stray in dist/README.txt dist/*.html.sha256 dist/archive/*/README.txt dist/a
   [[ ${#sib[@]} -eq 1 ]] || fail "$stray is not beside exactly one html"
 done
 
-# 7. say what would be zipped and sold
+# 7. an archive directory that exists must actually hold the version it is named after —
+#    otherwise "archived = N" counts a directory with nothing in it.
+if [[ -d dist/archive ]]; then
+  while IFS= read -r adir; do
+    av="$(basename "$adir")"
+    [[ -f "$adir/TaskApp-${av}.html" ]] \
+      || fail "$adir holds no TaskApp-${av}.html — an archive directory must contain the build it is named after"
+  done < <(find dist/archive -mindepth 1 -maxdepth 1 -type d | sort)
+fi
+
+# 8. say what would be zipped and sold
 if [[ -f dist/README.txt ]]; then
   release_version="$(grep -oE '^TaskApp [^ ]+' dist/README.txt | head -1 | awk '{print $2}')"
   [[ -n "$release_version" ]] || fail "dist/README.txt does not start with a version"
   [[ -f "dist/TaskApp-${release_version}.html" && -f "dist/TaskApp-${release_version}.html.sha256" ]] \
     || fail "dist/README.txt is for ${release_version} but those files are not at the top of dist/"
-  archives="$(ls -d dist/archive/*/ 2>/dev/null | wc -l | tr -d ' ')"
+  archives=0
+  if [[ -d dist/archive ]]; then
+    archives="$(find dist/archive -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"
+  fi
   printf '\ncheck-dist: %s coherent version drop(s); release = %s; archived = %s\n' \
     "$checked" "$release_version" "$archives"
 else

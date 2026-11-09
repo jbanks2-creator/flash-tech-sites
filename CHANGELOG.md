@@ -83,6 +83,15 @@ and export format v1 are unchanged**, so backups from rc.1 and rc.2 restore here
   `APP_VERSION` matching its filename, and no README describing a feature its build lacks.
   `build.sh` runs it as its last step, and now installs into `dist/` instead of wiping it.
   The product file is unchanged by any of this.
+- Follow-up fix to that script: its one-line summary said `archived = 1` on a tree with no
+  `dist/archive/` at all, because the count came from `ls -d dist/archive/*/` while
+  `nullglob` was set — with no match the glob vanished and `ls -d` listed `.`. It now counts
+  directories under `dist/archive` with `find` (0, 1 and 2 archives print 0, 1 and 2, and a
+  fresh clone that has only ever run `build.sh` prints 0), fails an archive directory that
+  holds no `TaskApp-<version>.html` so the count cannot include an empty directory, and finds
+  every html in `dist/` at any depth — an html buried in `dist/archive/<version>/old/` used
+  to escape both the per-file loop and the orphan check and now fails. The exit status and
+  the per-drop `ok` lines were already correct; nothing in `dist/` changed.
 
 ## [1.0.0-rc.2] — 2026-11-09
 
