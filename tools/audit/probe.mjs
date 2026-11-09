@@ -57,6 +57,7 @@ async function newPage(url = TARGET) {
   page.on("request", (r) => requested.push(r.url()));
   page.on("dialog", async (d) => { await d.dismiss().catch(() => {}); });
   await page.goto(url, { waitUntil: "load" });
+  await page.evaluate(() => { const b = document.querySelector('[data-act="welcomeEmpty"]'); if (b) b.click(); });
   await page.waitForTimeout(150);
   return { ctx, page, requested };
 }
@@ -382,6 +383,7 @@ if (ONLY === "all" || ONLY === "a11y") {
   const page = await ctx.newPage();
   await page.addInitScript(() => { window.__xss = 0; window.alert = () => {}; });
   await page.goto(TARGET, { waitUntil: "load" });
+  await page.evaluate(() => { const b = document.querySelector('[data-act="welcomeEmpty"]'); if (b) b.click(); });
   await page.waitForTimeout(150);
 
   const aria = await page.evaluate(() => {
@@ -521,6 +523,7 @@ if (ONLY === "all" || ONLY === "file") {
   const privCtx = await browser.newContext();
   const p2 = await privCtx.newPage();
   await p2.goto(TARGET, { waitUntil: "load" });
+  await p2.evaluate(() => { const b = document.querySelector('[data-act="welcomeEmpty"]'); if (b) b.click(); });
   const priv = await p2.evaluate(() => ({
     tasksAtStart: S.tasks.length,
     warningShown: /private|incognito/i.test(document.body.innerText),
@@ -531,6 +534,7 @@ if (ONLY === "all" || ONLY === "file") {
   const privCtx2 = await browser.newContext();
   const p3 = await privCtx2.newPage();
   await p3.goto(TARGET, { waitUntil: "load" });
+  await p3.evaluate(() => { const b = document.querySelector('[data-act="welcomeEmpty"]'); if (b) b.click(); });
   const priv2 = await p3.evaluate(() => ({ tasksInFreshPrivateWindow: S.tasks.length }));
   await privCtx2.close();
   log("private_window", { ...priv, ...priv2 });

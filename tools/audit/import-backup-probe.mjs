@@ -32,6 +32,7 @@ async function readDownload(dl) {
 }
 
 await page.goto(TARGET, { waitUntil: "load" });
+await page.evaluate(() => { const b = document.querySelector('[data-act="welcomeEmpty"]'); if (b) b.click(); });
 await page.evaluate(() => {
   localStorage.clear();
   S = blankState(); save();

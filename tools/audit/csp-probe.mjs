@@ -31,6 +31,7 @@ await page.addInitScript(() => {
 const requests = [];
 page.on("request", (r) => requests.push(r.url()));
 await page.goto(TARGET, { waitUntil: "load" });
+await page.evaluate(() => { const b = document.querySelector('[data-act="welcomeEmpty"]'); if (b) b.click(); });
 await page.waitForTimeout(300);
 // snapshot BEFORE the injection test, which legitimately requests a broken image
 const initialRequests = requests.slice();

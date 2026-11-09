@@ -27,6 +27,7 @@ await page.addInitScript(() => {
 });
 page.on("dialog", (d) => d.dismiss().catch(() => {}));
 await page.goto(TARGET, { waitUntil: "load" });
+await page.evaluate(() => { const b = document.querySelector('[data-act="welcomeEmpty"]'); if (b) b.click(); });
 
 const base = {
   format: "taskapp-export", version: 1,

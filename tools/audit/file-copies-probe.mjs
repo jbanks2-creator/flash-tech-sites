@@ -23,6 +23,7 @@ const ctx = await browser.newContext();
 
 const a = await ctx.newPage();
 await a.goto("file://" + SRC, { waitUntil: "load" });
+await a.evaluate(() => { const b = document.querySelector('[data-act="welcomeEmpty"]'); if (b) b.click(); });
 const wrote = await a.evaluate(() => {
   localStorage.clear(); S = blankState();
   createTask({ title: "FROM-COPY-A", domain_id: "business" }); return save();
@@ -30,10 +31,12 @@ const wrote = await a.evaluate(() => {
 
 const b = await ctx.newPage();
 await b.goto("file://" + COPY, { waitUntil: "load" });
+await b.evaluate(() => { const b = document.querySelector('[data-act="welcomeEmpty"]'); if (b) b.click(); });
 const seen = await b.evaluate(() => ({ tasks: S.tasks.length, titles: S.tasks.map((t) => t.title), origin: location.origin }));
 
 const c = await ctx.newPage();
 await c.goto("http://127.0.0.1:3601/", { waitUntil: "load" });
+await c.evaluate(() => { const b = document.querySelector('[data-act="welcomeEmpty"]'); if (b) b.click(); });
 const httpSeen = await c.evaluate(() => ({ tasks: S.tasks.length, titles: S.tasks.map((t) => t.title), origin: location.origin }));
 
 console.log(JSON.stringify({ wroteOnA: wrote, secondFileCopySees: seen, httpOriginSees: httpSeen }, null, 2));

@@ -26,6 +26,7 @@ page.on("dialog", (d) => (dialogAnswer ? d.accept() : d.dismiss()).catch(() => {
 // A plausible torn write: valid prefix, cut off mid-object, with a recoverable title in it.
 const CORRUPT = '{"version":1,"domains":[{"id":"business","name":"Business"}],"tasks":[{"id":"keep","title":"PRECIOUS PAYROLL RUN"';
 await page.goto(TARGET, { waitUntil: "load" });
+await page.evaluate(() => { const b = document.querySelector('[data-act="welcomeEmpty"]'); if (b) b.click(); });
 await page.evaluate((raw) => { localStorage.clear(); localStorage.setItem("taskapp.v1", raw); }, CORRUPT);
 await page.reload({ waitUntil: "load" });
 

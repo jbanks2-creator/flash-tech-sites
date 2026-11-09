@@ -18,6 +18,7 @@ const page = await ctx.newPage();
 let dialogMessages = [];
 page.on("dialog", (d) => { dialogMessages.push(d.message()); d.accept().catch(() => {}); });
 await page.goto(TARGET, { waitUntil: "load" });
+await page.evaluate(() => { const b = document.querySelector('[data-act="welcomeEmpty"]'); if (b) b.click(); });
 
 /* seed: one task with 2 notes and 1 attachment */
 const seeded = await page.evaluate(() => {

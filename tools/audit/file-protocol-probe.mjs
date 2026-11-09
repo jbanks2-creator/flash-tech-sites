@@ -28,6 +28,7 @@ const page = await ctx.newPage();
 const requests = [];
 page.on("request", (r) => requests.push(r.url()));
 await page.goto(URL, { waitUntil: "load" });
+await page.evaluate(() => { const b = document.querySelector('[data-act="welcomeEmpty"]'); if (b) b.click(); });
 await page.waitForTimeout(200);
 const initialRequests = requests.slice();
 

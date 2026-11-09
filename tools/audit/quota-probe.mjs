@@ -21,6 +21,7 @@ const browser = await chromium.launch({
 const ctx = await browser.newContext();
 const page = await ctx.newPage();
 await page.goto(TARGET, { waitUntil: "load" });
+await page.evaluate(() => { const b = document.querySelector('[data-act="welcomeEmpty"]'); if (b) b.click(); });
 
 const emit = (k, v) => console.log(`### ${k}\n${JSON.stringify(v, null, 2)}\n`);
 
@@ -126,9 +127,12 @@ emit("corrupt_blob_after_reload", await page.evaluate(() => ({ tasks: S.tasks.le
 
 emit("corrupt_blob_after_next_write", await page.evaluate(() => {
   createTask({ title: "new task", domain_id: "business" });
-  save();
-  const raw = localStorage.getItem("taskapp.v1");
-  return { tasksInBlob: JSON.parse(raw).tasks.length, preciousStillInBlob: raw.includes("PRECIOUS") };
+  const ok = save();
+  /* P0-3: while the unacknowledged unreadable blob is held in recovery, save() refuses to
+     write — so the stored value is still the truncated copy, not a fresh empty state. */
+  const raw = localStorage.getItem("taskapp.v1") || "";
+  let parsed = null; try { parsed = JSON.parse(raw); } catch (e) { parsed = null; }
+  return { saveReturned: ok, refusesToOverwrite: parsed === null, preciousStillStored: raw.includes("PRECIOUS") };
 }));
 
 await browser.close();

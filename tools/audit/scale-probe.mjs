@@ -17,6 +17,7 @@ const browser = await chromium.launch({
 const ctx = await browser.newContext({ viewport: { width: 1400, height: 900 } });
 const page = await ctx.newPage();
 await page.goto(TARGET, { waitUntil: "load" });
+await page.evaluate(() => { const b = document.querySelector('[data-act="welcomeEmpty"]'); if (b) b.click(); });
 
 const out = await page.evaluate(() => {
   localStorage.clear();

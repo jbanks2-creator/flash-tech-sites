@@ -12,6 +12,7 @@ const page = await ctx.newPage();
 await page.addInitScript(() => { window.__xss = 0; window.alert = () => { window.__xss++; }; });
 page.on("dialog", (d) => d.dismiss().catch(() => {}));
 await page.goto(TARGET, { waitUntil: "load" });
+await page.evaluate(() => { const b = document.querySelector('[data-act="welcomeEmpty"]'); if (b) b.click(); });
 
 const res = await page.evaluate(() => {
   localStorage.clear();

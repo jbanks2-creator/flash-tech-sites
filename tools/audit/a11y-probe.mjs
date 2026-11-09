@@ -17,6 +17,7 @@ const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, is
 const page = await ctx.newPage();
 page.on("dialog", (d) => d.dismiss().catch(() => {}));
 await page.goto(TARGET, { waitUntil: "load" });
+await page.evaluate(() => { const b = document.querySelector('[data-act="welcomeEmpty"]'); if (b) b.click(); });
 
 /* ---- semantics ---- */
 const aria = await page.evaluate(() => {

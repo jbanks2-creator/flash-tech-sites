@@ -22,6 +22,7 @@ const browser = await chromium.launch({
 const ctx = await browser.newContext({ acceptDownloads: true });
 const page = await ctx.newPage();
 await page.goto(TARGET, { waitUntil: "load" });
+await page.evaluate(() => { const b = document.querySelector('[data-act="welcomeEmpty"]'); if (b) b.click(); });
 
 const fill = await page.evaluate(() => {
   const mk = (i) => ({ id: "f" + i, title: ("filler " + i + " ").padEnd(120, "y"), description: "", domain_id: "business",

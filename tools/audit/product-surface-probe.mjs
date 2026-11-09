@@ -23,6 +23,7 @@ let dialogMode = "dismiss", dialogs = [];
 page.on("dialog", (d) => { dialogs.push(d.message().slice(0, 120)); (dialogMode === "accept" ? d.accept() : d.dismiss()).catch(() => {}); });
 
 await page.goto(TARGET, { waitUntil: "load" });
+await page.evaluate(() => { const b = document.querySelector('[data-act="welcomeEmpty"]'); if (b) b.click(); });
 await page.evaluate(() => { localStorage.clear(); S = blankState(); save(); render(); });
 
 /* ---- P1-6: version + About ---- */
@@ -30,12 +31,17 @@ const about = await page.evaluate(() => {
   ui.view = "settings"; render();
   const text = document.querySelector("#main").textContent;
   const payload = exportData();
+  const brand = document.querySelector("#brandVer").textContent.trim();
   return {
-    showsVersion: text.includes("1.0.0-beta.2"),
+    version: APP_VERSION,
+    semver: /^\d+\.\d+\.\d+/.test(APP_VERSION),
+    showsVersion: text.includes(APP_VERSION),
+    showsVersionInHeader: brand === "v" + APP_VERSION,
     hasAbout: /About/.test(text),
     hasLicence: /Licensed, not sold/.test(text),
+    hasLicenceStatus: /Unlicensed \(beta\)/.test(text),
     hasSupport: /purchase receipt/.test(text),
-    hasNoNetworkClaim: /no network/i.test(text),
+    hasNoNetworkClaim: /never leaves this device/i.test(text),
     exportVersion: payload.app_version,
     exportFormat: payload.version,
   };
@@ -114,10 +120,12 @@ const closed = await page.evaluate(() => ({
 }));
 
 const checks = {
-  version_shown_in_settings: about.showsVersion && about.hasAbout,
+  version_shown_in_settings: about.showsVersion && about.hasAbout && about.semver,
+  version_shown_in_header: about.showsVersionInHeader,
+  licence_status_shown: about.hasLicenceStatus,
   licence_and_support_present: about.hasLicence && about.hasSupport,
   network_claim_present: about.hasNoNetworkClaim,
-  export_records_app_version: about.exportVersion === "1.0.0-beta.2" && about.exportFormat === 1,
+  export_records_app_version: about.exportVersion === about.version && about.exportFormat === 1,
   contrast_all_pairs_pass: contrastFails.length === 0,
   sample_loads_27_tasks: sample.first.tasks === 27 && sample.first.projects === 5 && sample.first.topics === 3,
   sample_rows_are_tagged: sample.first.tagged === 27,
