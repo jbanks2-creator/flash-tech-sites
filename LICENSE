@@ -1,0 +1,35 @@
+TaskApp — licence notice
+========================
+
+Copyright © 2026 Jerry. All rights reserved.
+[Seller trading name pending — the EULA and the store page must name the same entity.]
+
+TaskApp is LICENSED, NOT SOLD. Your purchase buys a licence to use this software;
+it does not transfer ownership of it. You own everything you put into it.
+
+One licence covers one named user on one computer. Moving the licence to a replacement
+computer is fine, provided the old installation is removed. You may not copy, resell,
+sublicense, redistribute or bundle this file or its licence key, publish it on a shared
+drive or public web server, or remove this notice.
+
+THE FULL TERMS ARE THE END-USER LICENCE AGREEMENT (EULA) SUPPLIED WITH YOUR PURCHASE.
+In this repository it lives at:
+
+    businesses/flash-apps/docs/store/eula.md
+
+That document is the operative agreement when the product is sold. It is currently a
+draft: it carries [JERRY: …] placeholders for the legal entity, attorney and effective
+date, and it is not in force until those are filled and the first sale is made.
+
+The software is provided "AS IS", without warranty of any kind, express or implied,
+including merchantability, fitness for a particular purpose and non-infringement. To the
+maximum extent permitted by law, total liability is limited to the amount paid for the
+licence. Nothing here limits liability that cannot lawfully be limited.
+
+Your data stays on your machine. TaskApp stores everything in your browser's local
+storage and never transmits it; the publisher cannot see, back up or recover it. Exporting
+a backup is your responsibility.
+
+Third-party components: none. This product contains no third-party libraries, fonts or
+assets. The only third-party code in this repository is the development-only test harness
+under tools/audit (playwright-core), which is not part of the product and is not distributed.

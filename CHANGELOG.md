@@ -2,6 +2,70 @@
 
 All notable changes to TaskApp. Versioning is semver for the single-file product.
 
+## [1.0.0-rc.1] — 2026-11-09
+
+Productisation pass: the hardened app becomes something a stranger can buy, open and
+trust. Still one self-contained HTML file, still no build step to *run* it, still no
+dependencies, no network and no account. **`taskapp.v1` and the storage schema are
+unchanged, so existing data loads as-is.**
+
+### Added
+
+- **Identity.** Product title, meta description and an inlined SVG favicon/app icon.
+  `APP_VERSION` is visible in the header (`v1.0.0-rc.1`) and in Settings → About, which
+  now states licence status and "your data never leaves this device" in one place.
+- **First run.** With no stored state the app asks once: *start empty* / *load the demo
+  workspace* / *import a backup*. The answer is remembered (`taskapp.onboarded`);
+  dismissing with Escape counts as "not now", and the demo stays reachable in Settings.
+  The empty board now offers the demo too.
+- **Demo workspace.** `demo-data.json` — a real `taskapp-export` v1 file for a fictional IT
+  services company: 4 clients, 4 projects, 21 tasks, 2 notes, 3 research topics, two
+  overdue items and one due today. Embedded as `DEMO_DATA` (the app cannot fetch) and kept
+  as a separate file for the website demo; `scripts/embed-demo.mjs --check` fails the build
+  if they drift. Dates carry a `demo_anchor` and are shifted by `today − anchor` on load,
+  so the demo never ages into a wall of overdue. Loaded rows are flagged `demo`, shown
+  with a DEMO pill and notice, and cleared in one click — user rows are kept and re-homed.
+- **Print / PDF.** `@media print` forces a light palette in all three themes, drops the
+  header, filters, quick-add and buttons, adds a print-only heading (view · filter · date ·
+  version), prints the board two columns per page and the status column as text. Verified
+  by emulated-print screenshots and a generated A4 PDF.
+- **Help.** `?` or the header button opens *How it works* — a one-page guide plus the
+  keyboard-shortcut table — inside the file. No external docs.
+- **Licence hook.** A licence screen that accepts a key file, persists it under
+  `taskapp.licence`, and reports **"Unlicensed (beta)"**. Inert by design: commerce only
+  has to set `Licence.verify(keyText, meta)`.
+- **Distribution build.** `scripts/build.sh` → `dist/TaskApp-<version>.html` (readable, not
+  minified), `.sha256`, and a buyer-facing `README.txt`. The build validates version/CSP/
+  demo/no-network, builds twice and compares every output, and verifies the checksum.
+- **Repo hygiene.** README with labelled screenshot placeholders, CHANGELOG, VERSION,
+  LICENSE pointing at the EULA, and an explicit "deliberately dependency-free" note.
+
+### Changed
+
+- `product-surface-probe` reads the version from the page instead of hardcoding it, and
+  asserts the header chip, About, licence status and export all agree.
+- Every audit probe dismisses the first-run welcome, so the suite runs from a clean origin.
+- `quota-probe`'s last section now asserts the P0-3 refusal (it still expected the old
+  silent-overwrite behaviour, which made it crash rather than report).
+- `+ Project` is hidden in the header between 900 px and 1439 px: brand + version + 7 tabs +
+  search + five buttons do not fit on one row, and the version has to stay visible. It
+  remains on the Projects view and in Home's entry switcher.
+
+### Verification
+
+`productisation-probe.mjs` — 39 assertions across first run, demo load/clear, identity,
+print, help, licence and offline; all pass. The full hardening suite (XSS, silent writes,
+corrupt store, import/backup, product surface, a11y, undo, CSP, scale, file://) still
+passes, unchanged. `dist/TaskApp-1.0.0-rc.1.html` boots over `file://` with the demo and
+persists across reload; its sha256 (`b148c912…`) matches the bytes served on
+`127.0.0.1:3601` and by an independent HTTP server.
+
+### Still out of scope
+
+IndexedDB attachments (1.5 MB cap stays), custom dialogs to replace `confirm()`/`prompt()`,
+multi-tab merge, `prefers-color-scheme`/reduced motion, search inside notes. `SUPPORT_CONTACT`
+remains blank until `ops` supplies the address.
+
 ## [1.0.0-beta.2] — 2026-11-09
 
 Hardening pass driven by the readiness audit
