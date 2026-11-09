@@ -138,12 +138,12 @@ Everything else (file picker, status in Settings → About, persistence under
 
 ## Versioning
 
-`APP_VERSION` is what a buyer sees: shown in the header (`v1.0.0-rc.1`), in Settings →
+`APP_VERSION` is what a buyer sees: shown in the header (`v1.0.0-rc.2`), in Settings →
 About, and written into every export. It must equal `VERSION` — the build fails otherwise.
 
 | Here | Jay's label |
 |---|---|
-| `1.0.0-rc.1` (`VERSION`) | "TaskApp V4" + hardening + productisation |
+| `1.0.0-rc.2` (`VERSION`) | "TaskApp V4" + hardening + productisation + backup-restore fix (QA B1/B2/m1) |
 
 `V4` was Jay's own iteration label on the original upload; this repo starts a proper
 semver line at `1.0.0-beta.1` and the first commit kept the V4 file byte-identical
@@ -153,7 +153,7 @@ Three numbers are deliberately separate:
 
 | Number | Meaning | Current |
 |---|---|---|
-| `APP_VERSION` | what a buyer has | `1.0.0-rc.1` |
+| `APP_VERSION` | what a buyer has | `1.0.0-rc.2` |
 | export `version` | shape of the JSON file | `1` |
 | `STORE_KEY` / `version` | shape of the stored blob | `taskapp.v1` / `1` |
 
@@ -211,6 +211,7 @@ $P node tools/audit/a11y-probe.mjs            http://127.0.0.1:3601/   # P1-3, P
 $P node tools/audit/undo-probe.mjs            http://127.0.0.1:3601/   # P1-9
 $P node tools/audit/csp-probe.mjs             http://127.0.0.1:3601/   # P2-1 + no-network
 $P node tools/audit/scale-probe.mjs           http://127.0.0.1:3601/   # P1-2 timings
+$P node tools/audit/restore-domains-probe.mjs http://127.0.0.1:3601/   # restore B1/B2/m1
 $P node tools/audit/file-protocol-probe.mjs   index.html              # file:// + migration
 node tools/audit/csp-hash.mjs index.html                              # CSP drift check
 node scripts/embed-demo.mjs --check                                   # demo drift check
@@ -231,7 +232,7 @@ receipt.
 ```
 index.html                  the product (single file)
 demo-data.json              the demo workspace (taskapp-export v1); embedded into index.html
-VERSION                     1.0.0-rc.1
+VERSION                     1.0.0-rc.2
 LICENSE                     licence-not-sale statement, points at the EULA
 CHANGELOG.md                what changed, per version
 scripts/build.sh            dist artifact + checksum + README.txt (deterministic)

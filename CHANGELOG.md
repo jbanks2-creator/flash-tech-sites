@@ -2,6 +2,58 @@
 
 All notable changes to TaskApp. Versioning is semver for the single-file product.
 
+## [1.0.0-rc.2] — 2026-11-09
+
+Backup restore, fixed. The two blockers and one minor from the independent hostile-buyer QA
+(card `t_d017dbe3`) were all in the domain loop of `importData()`; every other verdict in
+that report held. **`taskapp.v1`, the storage schema and export format v1 are unchanged** —
+a backup written by rc.1 restores here.
+
+### Fixed
+
+- **B1 — a client's new name, colour and place in the list now survive a restore.** An
+  imported client whose id already exists is updated in place (name, colour, weight, order)
+  and reported as *updated*, instead of being silently skipped while the toast claimed
+  "0 updated". Rows without an `updated_at` — every export written before rc.2 — are
+  authoritative; when both sides carry a timestamp the newer one wins, so an old file
+  cannot rewind a rename made since.
+- **B2 — a client-name collision no longer rejects the whole backup.** When a file's client
+  carries a name the target already uses under a different id, the local row keeps its id
+  and the imported tasks, projects and research rows that pointed at the file's id are
+  re-filed onto it; the summary says `1 client matched by name`. The exact QA repro
+  (rename the default, then add a new client with the old name) now restores normally,
+  because the rename is applied before the name is tested.
+- **m1 — restoring onto a fresh install no longer leaves nine clients.** When the target is
+  a pristine install (the five stock clients, no rows) and the file carries clients, stock
+  clients the file does not mention — and that nothing points at — are replaced; the
+  summary reports `5 empty default clients replaced`. A stock client an imported row still
+  references is kept, so no row is left pointing at an id that was not added.
+- **Demo clients are cleared with the rest of the demo.** Client rows are now carried over
+  whole on insert, so the `demo` flag survives an import; "Clear demo data" no longer
+  leaves the demo clients behind after restoring a demo backup.
+
+### Changed
+
+- The import summary names the extra work it did: `clients matched by name`, `empty default
+  clients replaced`.
+- In-app help states the restore behaviour plainly: rows with the same id update (clients
+  included), a fresh install's five empty starter clients are replaced by the file's, and a
+  client whose name you already use is filed under the existing one.
+
+### Verified
+
+- `tools/audit/restore-domains-probe.mjs` — 31 assertions covering B1 (rename, colour,
+  order), B2 (the exact QA repro through the UI, plus a real merge collision across tasks,
+  projects and research), m1, demo flags surviving a restore, self-import as a no-op,
+  six hostile domain fixtures and the stale-timestamp guard.
+- Whole existing audit suite green: productisation, XSS through the UI and through imported
+  JSON, silent write, corrupt store, quota, import/pre-import backup, a11y, undo, CSP and
+  no-network, scale, `file://` protocol, CSP hash, demo drift.
+- Buyer QA harness re-run against the built artifact: `qa-rt` (round trip 21/21 tasks,
+  4/4 projects, 4/4 clients, 0 field diffs), `qa-data` (round trip diff 0, self-import
+  unchanged, 10/10 hostile imports refused with state byte-identical), `qa-data2`
+  (`T1 round-trips`, `T2` restored), `qa-data3` (collision restores: 1 task, 6 clients).
+
 ## [1.0.0-rc.1] — 2026-11-09
 
 Productisation pass: the hardened app becomes something a stranger can buy, open and

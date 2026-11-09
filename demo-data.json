@@ -1,7 +1,7 @@
 {
   "format": "taskapp-export",
   "version": 1,
-  "app_version": "1.0.0-rc.1",
+  "app_version": "1.0.0-rc.2",
   "demo": true,
   "demo_anchor": "2026-11-08",
   "exported_at": "2026-11-08T20:00:00.000Z",

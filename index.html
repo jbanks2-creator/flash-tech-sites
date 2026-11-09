@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-C1ragFL4qO1xRsx2YWNY3bWj3bFTjO9OAvmQjQ+/1KA=' 'sha256-4EbevMnTkHNAbLhUAcirlOtFh9An4sHXhVM4fMhJEaM='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'none'; base-uri 'none'; object-src 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-C1ragFL4qO1xRsx2YWNY3bWj3bFTjO9OAvmQjQ+/1KA=' 'sha256-t+338JgnKIc/WebPIh4HZ3lh9dACjw8JjhT5I9twtmo='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'none'; base-uri 'none'; object-src 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>TaskApp — tasks, projects and clients</title>
 <meta name="description" content="A task, project and client manager in one HTML file. No account, no cloud, no network: your data never leaves this device.">
@@ -459,7 +459,7 @@ const STORE_KEY = "taskapp.v1";
    is the shape of the JSON file (bump only when the format changes); STORE_SCHEMA_VERSION
    is the shape of the localStorage blob (bump only with a migration in migrateState).
    "taskapp.v1" keeps its name because renaming the key would orphan existing buyers. */
-const APP_VERSION = "1.0.0-rc.1";
+const APP_VERSION = "1.0.0-rc.2";
 const EXPORT_FORMAT_VERSION = 1;
 const STORE_SCHEMA_VERSION = 1;
 /* Filled in by ops when the support address is decided. Until then the honest answer is
@@ -1098,7 +1098,7 @@ function importData(data){
 
   /* ---- 2. stage everything; S is replaced only when every row passes ---- */
   const next = clone(S);
-  const st = {inserted:0, updated:0, skipped:0};
+  const st = {inserted:0, updated:0, skipped:0, merged:0, defaultsReplaced:0};
   const errors = [];
   const fail = (where, msg) => errors.push(`${where}: ${msg}`);
   const seen = {domains:new Set(), projects:new Set(), tasks:new Set(), notes:new Set(), attachments:new Set(), research:new Set()};
@@ -1113,6 +1113,34 @@ function importData(data){
     else st.skipped++;
   };
 
+  /* m1: a backup restored onto a pristine install (the five stock clients, no rows of any
+     kind) must not come back as nine clients. `inPlay` is every domain id this file
+     mentions, directly or through a row that points at it, so a stock client is only
+     dropped when nothing in the file needs it — no row is ever left pointing at a domain
+     that was removed. */
+  const inPlay = new Set((data.domains || []).filter(isObj).map(d => d.id));
+  for (const k of ["tasks","projects","research"])
+    for (const r of (data[k] || [])) if (isObj(r) && typeof r.domain_id === "string") inPlay.add(r.domain_id);
+  const isStock = d => {
+    const def = DEFAULT_DOMAINS.find(x => x.id === d.id);
+    return !!def && d.name === def.name && d.color === def.color
+      && d.weight === def.weight && d.sort_order === def.sort_order;
+  };
+  const pristine = !hasUserData() && S.domains.length > 0 && S.domains.every(isStock)
+    && (data.domains || []).length > 0;
+
+  /* Domains are upserted like every other table, with two wrinkles.
+
+     (1) Rows written before domains carried an `updated_at` have no timestamp, so "newer"
+         cannot be decided by timestamps alone: a file with no stamp is authoritative and
+         an existing id is changed when any of the four user-editable fields differ. That
+         is what makes a renamed/recoloured/reordered client survive a restore (QA B1).
+     (2) A file row whose *name* matches a local domain under a different id is not
+         dropped — that used to strand every task pointing at it and reject the whole
+         import (QA B2). The local row keeps its id, and imported rows that pointed at the
+         file's id are re-pointed below via `domainRemap`. */
+  const domainRemap = new Map();     // file domain id -> local domain id that owns the name
+  const domainTouched = new Set();   // local ids this file rewrote, so a clash cannot map onto one
   for (const [i, d] of (data.domains || []).entries()) {
     const where = `domains[${i}]`;
     if (!isObj(d) || anyFunction(d)) { fail(where, "must be a plain object"); continue; }
@@ -1121,15 +1149,38 @@ function importData(data){
     const name = typeof d.name === "string" ? d.name.trim() : "";
     if (!name) { fail(where, "name must be a non-empty string"); continue; }
     if (name.length > 40) { fail(where, "name is longer than 40 characters"); continue; }
-    if (next.domains.some(x => x.id === d.id)) continue;                       // exists here: keep local
-    if (next.domains.some(x => x.name.toLowerCase() === name.toLowerCase())) { st.skipped++; continue; }
-    next.domains.push({
-      id: d.id, name,
+    const fields = {
+      name,
       weight: Number.isFinite(d.weight) ? d.weight : 1,
       color: /^#[0-9a-fA-F]{6}$/.test(d.color || "") ? d.color : "#6b7280",
-      sort_order: Number.isInteger(d.sort_order) ? d.sort_order : Math.max(0, ...next.domains.map(x => x.sort_order || 0)) + 1,
-    });
+      sort_order: Number.isInteger(d.sort_order) ? d.sort_order : null,
+    };
+    const existing = next.domains.find(x => x.id === d.id);
+    if (existing) {
+      domainTouched.add(existing.id);
+      if (fields.sort_order === null) fields.sort_order = existing.sort_order;
+      const changed = ["name","weight","color","sort_order"].some(k => fields[k] !== existing[k]);
+      const fileStamp = typeof d.updated_at === "string" ? d.updated_at : "";
+      const localStamp = typeof existing.updated_at === "string" ? existing.updated_at : "";
+      const newer = !fileStamp || !localStamp || fileStamp >= localStamp;
+      if (changed && newer) { Object.assign(existing, fields, {updated_at: nowUtc()}); st.updated++; }
+      else st.skipped++;
+      continue;
+    }
+    const clash = next.domains.find(x => x.name.toLowerCase() === name.toLowerCase() && !domainTouched.has(x.id))
+               || next.domains.find(x => x.name.toLowerCase() === name.toLowerCase());
+    if (clash) { domainRemap.set(d.id, clash.id); st.merged++; continue; }
+    if (fields.sort_order === null)
+      fields.sort_order = Math.max(0, ...next.domains.map(x => x.sort_order || 0)) + 1;
+    next.domains.push(Object.assign({}, d, {id: d.id}, fields));   // keeps extra keys such as `demo`
     st.inserted++;
+  }
+  if (pristine) {
+    for (const id of domainRemap.values()) inPlay.add(id);
+    next.domains = next.domains.filter(d => {
+      if (!isStock(d) || inPlay.has(d.id)) return true;
+      st.defaultsReplaced++; return false;
+    });
   }
 
   for (const [i, p] of (data.projects || []).entries()) {
@@ -1140,6 +1191,7 @@ function importData(data){
     const row = Object.assign({description:"", criticality:3, status:"active", due_date:null,
       created_at:nowUtc(), updated_at:nowUtc(), archived_at:null}, p);
     if (typeof row.name !== "string") { fail(where, "name must be a string"); continue; }
+    if (domainRemap.has(row.domain_id)) row.domain_id = domainRemap.get(row.domain_id);
     row.name = row.name.trim();
     const err = validateProject(row, next); if (err) { fail(where, err); continue; }
     upsert(next.projects, row);
@@ -1156,6 +1208,7 @@ function importData(data){
     row.name = row.name.trim();
     if (typeof row.body !== "string") { fail(where, "body must be a string"); continue; }
     row.tags = cleanTags(Array.isArray(row.tags) ? row.tags : []);
+    if (domainRemap.has(row.domain_id)) row.domain_id = domainRemap.get(row.domain_id);
     if (row.domain_id && !next.domains.some(d => d.id === row.domain_id)) row.domain_id = null;   // optional link
     if (!Array.isArray(row.links) || !Array.isArray(row.log)) { fail(where, "links and log must be lists"); continue; }
     let bad = false;
@@ -1188,6 +1241,7 @@ function importData(data){
     row.title = row.title.trim();
     if (!row.title) { fail(where, "title must not be empty"); continue; }
     if (row.title.length > 500) { fail(where, "title is longer than 500 characters"); continue; }
+    if (domainRemap.has(row.domain_id)) row.domain_id = domainRemap.get(row.domain_id);
     if (row.project_id && !next.projects.some(p => p.id === row.project_id)) { fail(where, "unknown project_id"); continue; }
     if (row.research_id && !next.research.some(r => r.id === row.research_id)) { fail(where, "unknown research_id"); continue; }
     if (row.recurrence_parent_id && row.recurrence_parent_id !== row.id && !next.tasks.some(x => x.id === row.recurrence_parent_id)) row.recurrence_parent_id = null;
@@ -1342,7 +1396,7 @@ function removeSample(){
 const DEMO_DATA = {
   "format": "taskapp-export",
   "version": 1,
-  "app_version": "1.0.0-rc.1",
+  "app_version": "1.0.0-rc.2",
   "demo": true,
   "demo_anchor": "2026-11-08",
   "exported_at": "2026-11-08T20:00:00.000Z",
@@ -2217,7 +2271,7 @@ function helpHtml(){
     <p>Type straight into the quick-add bar: <code>Call Dana about cutover !high #northgate @network due:tue</code> means priority high, client Northgate, project “network…”, due Tuesday. <code>every:week</code> repeats it.</p>
 
     <h4>Where your data lives</h4>
-    <p>In this browser, on this device, and nowhere else. We cannot see it and cannot recover it. <b>Settings → Export backup</b> writes one JSON file — put it in your Google Drive or OneDrive folder, and do it weekly. <b>Import</b> merges a backup back in: same ids are updated, new ones added, nothing is deleted. Before any import the app downloads a safety copy of what you already had.</p>
+    <p>In this browser, on this device, and nowhere else. We cannot see it and cannot recover it. <b>Settings → Export backup</b> writes one JSON file — put it in your Google Drive or OneDrive folder, and do it weekly. <b>Import</b> merges a backup back in: rows with the same id are updated (client names, colours and order included), new ones are added, and nothing of yours is deleted. Restoring onto a fresh install replaces the five empty starter clients with the ones in your file, and a client whose name you already use is filed under the one you already have. Before any import the app downloads a safety copy of what you already had.</p>
 
     <h4>Printing</h4>
     <p>The <b>Print</b> button (or Ctrl/⌘ + P) prints the view you are looking at as a clean, light sheet — headers, filters and buttons are dropped. The board prints two columns to a page; the list and focus views print one item per row.</p>
@@ -3228,7 +3282,13 @@ $("#importFile").addEventListener("change", e => {
       if (!save()) throw new Error("the import could not be written to storage, so it was rolled back");
       localStorage.setItem("taskapp.lastImport", nowUtc());
       render();
-      toast(`Imported: ${st.inserted} added, ${st.updated} updated, ${st.skipped} unchanged` + (isDemo ? " · demo data labelled, clear it in Settings" : "") + (backedUp ? " · pre-import backup downloaded" : " · backup could not be downloaded"));
+      const notes = [
+        st.merged ? `${st.merged} client${st.merged === 1 ? "" : "s"} matched by name` : "",
+        st.defaultsReplaced ? `${st.defaultsReplaced} empty default client${st.defaultsReplaced === 1 ? "" : "s"} replaced` : "",
+        isDemo ? "demo data labelled, clear it in Settings" : "",
+        backedUp ? "pre-import backup downloaded" : "backup could not be downloaded",
+      ].filter(Boolean).join(" · ");
+      toast(`Imported: ${st.inserted} added, ${st.updated} updated, ${st.skipped} unchanged · ${notes}`);
     } catch (err) { toast("Import failed: " + err.message, true); }
     reset();
   };
