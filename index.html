@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-C1ragFL4qO1xRsx2YWNY3bWj3bFTjO9OAvmQjQ+/1KA=' 'sha256-aQzMOSwBGqo68yL8zwERGijmzCAZ4p2NpuHkudeOhgE='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'none'; base-uri 'none'; object-src 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-C1ragFL4qO1xRsx2YWNY3bWj3bFTjO9OAvmQjQ+/1KA=' 'sha256-EqBU/p/2qcmohIOZydV8Ifk4XZRvsq+ub0tm1H4XBs8='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'none'; base-uri 'none'; object-src 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>TaskApp — tasks, projects and clients</title>
 <meta name="description" content="A task, project and client manager in one HTML file. No account, no cloud, no network: your data never leaves this device.">
@@ -134,6 +134,10 @@ body.dragging .card{cursor:grabbing}
 .empty{color:var(--muted);text-align:center;padding:40px 10px}
 
 /* list view */
+/* m3: at 375px the list table is ~398px wide, which used to widen the layout viewport to
+   409 and make Chrome zoom the whole page out to ~91% (so switching views re-flowed text).
+   The table now scrolls inside this wrapper and the page keeps the device width. */
+.tablewrap{max-width:100%;overflow-x:auto;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
 table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
 th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
 th{color:var(--muted);font-weight:500;font-size:12px;background:var(--card)}
@@ -177,6 +181,10 @@ aside.drawer{position:fixed;top:0;right:0;bottom:0;width:min(520px,100vw);backgr
 .x{background:none;border:0;font-size:22px;color:var(--muted);line-height:1}
 .note{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:6px;white-space:pre-wrap}
 .note .when{font-size:11px;color:var(--muted);display:flex;justify-content:space-between}
+/* m6: shown inside a panel whose record changed in another tab while it was open */
+.stalenote{background:var(--soon-bg);border:1px solid var(--soon-bd);color:var(--soon-fg);border-radius:8px;
+  padding:8px 10px;margin:0 0 10px;font-size:12.5px;line-height:1.45}
+.stalenote .btn{margin-top:6px;background:transparent;border-color:currentColor;color:inherit}
 .att{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:6px 10px;margin-bottom:6px}
 .att a{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 h4.sec{margin:18px 0 8px;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px}
@@ -307,6 +315,14 @@ details.grp .rows{margin-top:6px}
   .hide-sm{display:none}
   table .hide-sm{display:none}
 }
+/* m2: at 375px the tab strip hid Settings and Research behind a silent sideways scroll
+   (the half-clipped "R" of Research was the only hint), and Settings is where Export and
+   Import live. Under 620px the strip wraps into full-width rows instead: every view is on
+   screen, nothing scrolls, and each target keeps its 44px height. */
+@media (max-width:620px){
+  .tabs{flex-wrap:wrap;overflow:visible;width:100%;max-width:none;border-radius:14px;row-gap:3px}
+  .tabs button{flex:1 1 auto;padding:6px 8px;text-align:center}
+}
 
 /* =====================================================================
    Product surfaces: version, DEMO label, welcome / help / licence panels
@@ -400,6 +416,7 @@ kbd{background:var(--card2);border:1px solid var(--border);border-bottom-width:2
   .focus{max-width:none;margin:0;gap:10px}
   .fcard .rank{font-size:9pt;color:#4b5563}
   .fcard .t{font-size:12pt;font-weight:700;margin:2px 0 4px}
+  .tablewrap{overflow:visible;max-width:none}
   table{width:100%;border-collapse:collapse;font-size:10pt}
   table th{text-align:left;border-bottom:2px solid #111827;padding:4px 6px;font-size:8.5pt;text-transform:uppercase;letter-spacing:.04em}
   tr.row td{border-bottom:1px solid #d7dde6;padding:5px 6px;vertical-align:top}
@@ -459,7 +476,7 @@ const STORE_KEY = "taskapp.v1";
    is the shape of the JSON file (bump only when the format changes); STORE_SCHEMA_VERSION
    is the shape of the localStorage blob (bump only with a migration in migrateState).
    "taskapp.v1" keeps its name because renaming the key would orphan existing buyers. */
-const APP_VERSION = "1.0.0-rc.2";
+const APP_VERSION = "1.0.0-rc.3";
 const EXPORT_FORMAT_VERSION = 1;
 const STORE_SCHEMA_VERSION = 1;
 /* Filled in by ops when the support address is decided. Until then the honest answer is
@@ -676,7 +693,20 @@ function save(){
 }
 function saveFailed(){ return !!( $("#banner") && $("#banner").dataset.bannerId === "save" ); }
 window.addEventListener("storage", e => {
-  if (e.key === STORE_KEY && !RECOVERY) { S = loadState(); render(); }
+  if (e.key === STORE_KEY && !RECOVERY) {
+    /* m6: another tab wrote. Reload the whole state first — that is what keeps edits to
+       *different* rows safe — then look at the row this panel is editing. */
+    const snapshot = ui.drawerSnapshot, editing = !!(ui.drawer && ui.drawer.id);
+    S = loadState(); render();
+    if (editing && snapshot != null) {
+      const rec = drawerRecord();
+      if (!rec) { toast("That record was deleted in another tab", true); closeDrawer(); }
+      else if (JSON.stringify(rec) !== snapshot) {
+        if (drawerHasUnsavedChanges()) showStaleNotice();
+        else refreshDrawer();          // nothing typed here: show the version they saved
+      }
+    }
+  }
   if (e.key === "taskapp.theme" && e.newValue) { document.documentElement.dataset.theme = e.newValue; updateThemeBtn(); if (ui.view === "settings") render(); }
 });
 
@@ -1037,10 +1067,26 @@ function safeName(name){
 }
 
 /* ------------------------------------------------------------------ export / import */
+/* m5: a backup should be reproducible. exportData() used to mint a fresh UUID for every
+   tag on every export, so two exports of untouched data differed (same length, 10 changed
+   tag ids) and nobody could checksum a backup. Tag ids are now derived from the tag name —
+   stable across exports and across machines — with a deterministic suffix only if two
+   different names slug to the same id. Imports still match tags by name, so old files that
+   carry random ids keep working. */
+function stableTagId(name, taken){
+  const key = String(name).toLowerCase();
+  let base = "tag-" + key.normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
+  if (!base || base === "tag-") base = "tag";
+  let id = base, n = 2;
+  while (taken.has(id) && taken.get(id) !== key) id = base + "-" + (n++);
+  taken.set(id, key);
+  return id;
+}
 function exportData(){
-  const tagIds = new Map(), task_tags = [];
+  const tagIds = new Map(), tagIdTaken = new Map(), task_tags = [];
   for (const t of S.tasks) for (const g of t.tags) {
-    const key = g.toLowerCase(); if (!tagIds.has(key)) tagIds.set(key, {id:uuid(), name:g});
+    const key = g.toLowerCase();
+    if (!tagIds.has(key)) tagIds.set(key, {id:stableTagId(g, tagIdTaken), name:g});
     task_tags.push({task_id:t.id, tag_id:tagIds.get(key).id});
   }
   return {
@@ -2281,6 +2327,8 @@ function helpHtml(){
 
     <h4>Where your data lives</h4>
     <p>In this browser, on this device, and nowhere else. We cannot see it and cannot recover it. <b>Settings → Export backup</b> writes one JSON file — put it in your Google Drive or OneDrive folder, and do it weekly. <b>Import</b> merges a backup back in: rows with the same id are updated (client names, colours and order included), new ones are added, and nothing of yours is deleted. Restoring onto a fresh install replaces the five empty starter clients with the ones in your file, and a client whose name you already use is filed under the one you already have. Before any import the app downloads a safety copy of what you already had.</p>
+    <p><b>One browser, several tabs.</b> Finishing a task in one tab never rolls back work done in another, and if the record you have open is changed in a second tab, the panel tells you and asks before replacing it. Refreshing or closing the tab with unsaved text in a panel asks first, too.</p>
+    <p><b>Browsers:</b> this release is built and tested in Chromium — Chrome, Microsoft Edge, Brave, Opera or Vivaldi. Firefox and Safari are untested in this build.</p>
 
     <h4>Printing</h4>
     <p>The <b>Print</b> button (or Ctrl/⌘ + P) prints the view you are looking at as a clean, light sheet — headers, filters and buttons are dropped. The board prints two columns to a page; the list and focus views print one item per row.</p>
@@ -2590,7 +2638,7 @@ function renderList(main){
   const all = visibleTasks().filter(t => t.status !== "completed" || ui.q).sort(byImportance);
   if (!S.tasks.length) { main.innerHTML = emptyHtml(); return; }
   const tasks = all.slice(0, ui.listLimit), hidden = all.length - tasks.length;
-  main.innerHTML = `<table><thead><tr><th>Task</th><th class="hide-sm">Domain</th><th class="hide-sm">Project</th><th>Status</th><th class="hide-sm">Priority</th><th>Due</th></tr></thead><tbody>
+  main.innerHTML = `<div class="tablewrap"><table><thead><tr><th>Task</th><th class="hide-sm">Domain</th><th class="hide-sm">Project</th><th>Status</th><th class="hide-sm">Priority</th><th>Due</th></tr></thead><tbody>
     ${tasks.map(t => { const d = domainById(t.domain_id), p = projectById(t.project_id); return `<tr class="row" data-id="${esc(t.id)}" tabindex="0">
       <td><b>${esc(t.title)}</b> ${t.recurrence!=="none"?"🔁":""}</td>
       <td class="hide-sm"><span class="dot" style="--c:${esc(d?.color)}"></span> ${esc(d?.name)}</td>
@@ -2598,7 +2646,7 @@ function renderList(main){
       <td><select class="noprint" data-status-for="${esc(t.id)}">${STATUSES.map(([s,l]) => `<option value="${s}" ${s===t.status?"selected":""}>${l}</option>`).join("")}</select><span class="printonly">${esc(STATUS_LABEL[t.status] || t.status)}</span></td>
       <td class="hide-sm"><span class="badge ${t.priority}">${t.priority}</span></td>
       <td>${dueBadge(t) || '<span class="muted">—</span>'}</td></tr>`; }).join("")}
-  </tbody></table>
+  </tbody></table></div>
   ${hidden ? `<p><button class="btn sm" data-morelist>Show ${Math.min(LIST_PAGE, hidden)} more · ${hidden} hidden</button></p>` : ""}
   <p class="muted small noprint">Open tasks, highest priority first, then soonest due. Completed tasks are hidden unless you search.</p>`;
 }
@@ -2740,6 +2788,7 @@ function renderSettings(main){
   <div class="section"><h3>Backup &amp; data</h3>
     <p class="muted small">Your tasks are stored in <b>this browser only</b> (${(usedChars/1048576).toFixed(2)} MB of text used — ${usedPct}% of the ~5 MB browser limit).
       Clearing browser data erases them, so export a backup regularly — for example into your Google Drive folder. The export file also imports into the full SQLite TaskApp.</p>
+    <p class="muted small">Exports are reproducible: tag ids are derived from the tag name, so the same data exports identically apart from the one <code>exported_at</code> timestamp. To checksum a backup, remove that line first (<code>jq -S 'del(.exported_at)' backup.json | sha256sum</code>) and compare with a later export of unchanged data.</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn primary" data-act="export">Export backup (.json)</button>
       <button class="btn" data-act="import">Import / merge backup</button>
@@ -2802,6 +2851,17 @@ function drawerFormState(){
 function drawerHasUnsavedChanges(){
   return !!(ui.drawer && ui.drawerDirty != null && drawerFormState() !== ui.drawerDirty);
 }
+/* m6: the record a panel is editing, so a cross-tab write to *that row* can be noticed.
+   (Different rows are safe: the storage listener reloads the whole state before any save,
+   so one tab's edit never rolls back another tab's new task.) */
+function drawerRecord(){
+  const d = ui.drawer;
+  if (!d || !d.id) return null;
+  if (d.type === "task") return taskById(d.id) || null;
+  if (d.type === "project") return projectById(d.id) || null;
+  if (d.type === "topic") return researchById(d.id) || null;
+  return null;
+}
 function openDrawer(html, label){
   const d = $("#drawer"), wasOpen = !d.classList.contains("hidden");
   if (!wasOpen) setOpener(document.activeElement);
@@ -2810,13 +2870,16 @@ function openDrawer(html, label){
   d.setAttribute("aria-modal", "true");
   if (label) d.setAttribute("aria-label", label);
   ui.drawerDirty = drawerFormState();
+  const rec = drawerRecord();
+  ui.drawerSnapshot = rec ? JSON.stringify(rec) : null;   // what this panel believes is on disk
+  ui.drawerStale = false;
   setTimeout(() => d.querySelector("[autofocus]")?.focus(), 30);
 }
 function closeDrawer(){
   ui.domDelete = null;
   ui.welcome = false;
   $("#drawer").classList.add("hidden"); $("#scrim").classList.add("hidden");
-  ui.drawer = null; ui.drawerDirty = null;
+  ui.drawer = null; ui.drawerDirty = null; ui.drawerSnapshot = null; ui.drawerStale = false;
   if (lastOpener && document.contains(lastOpener) && typeof lastOpener.focus === "function") { try { lastOpener.focus(); } catch (e) {} }
   lastOpener = null;
 }
@@ -2832,6 +2895,42 @@ function tryCloseDrawer(){
   if (drawerHasUnsavedChanges() && !confirm("Discard your unsaved changes in this panel?")) return;
   closeDrawer();
 }
+/* m6: another tab saved while this panel was open. With nothing typed, just show their
+   version. With typed text, say so instead of letting the next save replace it quietly. */
+function refreshDrawer(){
+  const d = ui.drawer; if (!d || !d.id) return;
+  const sc = $("#drawer .db")?.scrollTop || 0;
+  if (d.type === "task") openTask(d.id);
+  else if (d.type === "project") openProject(d.id);
+  else if (d.type === "topic") openTopic(d.id);
+  const db = $("#drawer .db"); if (db) db.scrollTop = sc;
+}
+function showStaleNotice(){
+  const db = $("#drawer .db");
+  if (!db || db.querySelector(".stalenote")) return;
+  ui.drawerStale = true;
+  const what = ui.drawer.type === "topic" ? "research topic" : ui.drawer.type;
+  db.insertAdjacentHTML("afterbegin", `<div class="stalenote" role="status"><b>Changed in another tab.</b>
+    This ${esc(what)} was saved in another tab after you opened it, so this panel is now the older
+    version. <button class="btn sm" data-act="reloadRecord">Load the other tab's version</button></div>`);
+}
+/* A save from a panel we know is behind asks first, so the other tab's change is never
+   overwritten silently. Cancelling keeps every character the user typed. */
+function confirmStaleWrite(){
+  if (!ui.drawerStale) return true;
+  if (!confirm("This record was changed in another tab after you opened this panel. Save yours and replace their version?")) return false;
+  ui.drawerStale = false;
+  return true;
+}
+/* m4: refresh or close-tab mid-edit used to drop typed text with no warning, while the
+   panel's three close paths already asked. This prompts only when an open panel holds
+   unsaved input — an idle tab never prompts. Mobile browsers may suppress the prompt, so
+   the in-app close paths keep asking; Ctrl/Cmd+Enter saves without leaving the page. */
+window.onbeforeunload = e => {
+  if (!drawerHasUnsavedChanges()) return undefined;
+  e.preventDefault(); e.returnValue = "";
+  return "";
+};
 const opt = (v, label, sel) => `<option value="${esc(v)}" ${v === sel ? "selected" : ""}>${esc(label)}</option>`;
 function domainOptions(sel, withNew){ return sortedDomains().map(d => opt(d.id, d.name, sel)).join("") + (withNew ? `<option value="__new">+ New domain…</option>` : ""); }
 function projectOptions(sel){ return `<option value="">— none (standalone) —</option>` + S.projects.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(p => opt(p.id, p.name + (p.status==="done"?" (done)":""), sel)).join(""); }
@@ -3005,17 +3104,23 @@ function act(name, el){
         finishWelcome(); closeDrawer(); toast("Starting empty — press n for a new task, or Settings → Load the demo workspace"); break;
       /* ---- help, print, licence ---- */
       case "help": openHelp(); break;
+      case "reloadRecord":
+        if (ui.drawer && ui.drawer.id && confirm("Discard what you typed and load the version saved in the other tab?")) refreshDrawer();
+        break;
       case "print": window.print(); break;
       case "licence": openLicence(); break;
       case "licencePick": $("#licenceFile").click(); break;
       case "import": $("#importFile").click(); break;
       case "newProject": openProject(null); break;
       case "saveTask": {
+        if (!confirmStaleWrite()) break;
         const f = readTaskForm();
         if (!d.id) { const t = createTask(f); commit("Task created"); closeDrawer(); if (!visibleTasks().includes(t)) toast("Created — hidden by the current filter"); }
         else { updateTask(d.id, f); commit("Saved"); closeDrawer(); }
         break; }
-      case "completeTask": updateTask(d.id, {...readTaskForm(), status:"completed"}); commit("Done ✓"); closeDrawer(); break;
+      case "completeTask":
+        if (!confirmStaleWrite()) break;
+        updateTask(d.id, {...readTaskForm(), status:"completed"}); commit("Done ✓"); closeDrawer(); break;
       case "deleteTask": {
         const t = taskById(d.id); if (!t) break;
         const nn = S.notes.filter(n => n.task_id === t.id).length, na = S.attachments.filter(a => a.task_id === t.id).length;
@@ -3034,6 +3139,7 @@ function act(name, el){
         S.attachments.push({id:uuid(), task_id:d.id, file_name: v.length > 80 ? v.slice(0,77)+"…" : v, url, mime_type:"text/uri-list", size_bytes:0, created_at:nowUtc()});
         taskById(d.id).updated_at = nowUtc(); save(); render(); reopenTask(d.id); break; }
       case "saveProject": {
+        if (!confirmStaleWrite()) break;
         const f = readProjectForm();
         if (!d.id) createProject(f); else updateProject(d.id, f);
         commit(d.id ? "Project saved" : "Project created"); closeDrawer(); break; }
@@ -3067,6 +3173,7 @@ function act(name, el){
         }
         focusEntry(); break; }
       case "saveTopic": {
+        if (!confirmStaleWrite()) break;
         if (!d.id) { const r = createTopic(readTopicForm()); commit("Topic created — add links and log entries below"); openTopic(r.id); }
         else { updateTopic(d.id, readTopicForm()); commit("Topic saved"); closeDrawer(); }
         break; }
