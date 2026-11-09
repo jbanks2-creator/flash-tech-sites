@@ -56,6 +56,16 @@ button{cursor:pointer}
 a{color:var(--accent)}
 .hidden{display:none!important}
 
+/* persistent system banner above <main> — quota failures and data recovery live here,
+   because a toast disappears before the user has read it */
+.banner{margin:0;padding:10px 16px;display:flex;gap:12px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;border-bottom:1px solid var(--border);font-size:13px;line-height:1.45}
+.banner.error{background:var(--danger-bg);border-color:var(--danger-bd);color:var(--danger-fg)}
+.banner.warn{background:var(--soon-bg);border-color:var(--soon-bd);color:var(--soon-fg)}
+.banner.info{background:var(--card2)}
+.banner .banner-txt{flex:1;min-width:220px}
+.banner .banner-acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.banner code{background:var(--code-bg);border:1px solid var(--border);border-radius:4px;padding:0 4px;font-size:12px}
+
 /* header */
 header{position:sticky;top:0;z-index:20;background:var(--header-bg);backdrop-filter:blur(6px);border-bottom:1px solid var(--border)}
 .bar{display:flex;align-items:center;gap:10px;padding:10px 16px;flex-wrap:wrap}
@@ -289,6 +299,7 @@ details.grp .rows{margin-top:6px}
   </div>
   <div class="filters" id="filters"></div>
 </header>
+<div id="banner" class="banner hidden" role="alert" aria-live="assertive"></div>
 <main id="main"></main>
 <div id="scrim" class="scrim hidden"></div>
 <aside id="drawer" class="drawer hidden"></aside>
@@ -388,27 +399,126 @@ function toast(msg, err=false){
 }
 
 /* ------------------------------------------------------------------ state */
+const STATE_ARRAYS = ["domains","projects","tasks","notes","attachments","research"];
+// Measured ceiling in Chromium is 5,242,632 characters stored (§1.1 of the audit).
+const QUOTA_CEILING = 5240000;
+const QUOTA_WARN = 4400000;              // ~84%: warn while the user can still act
 function blankState(){ return {version:1, domains:clone(DEFAULT_DOMAINS), projects:[], tasks:[], notes:[], attachments:[], research:[], settings:{}}; }
+
+/* Every load goes through this. Version 1 is the only on-disk format; the scoring fields
+   from the ancestor app are dropped. Throws when the blob is not a usable state, which is
+   what routes the caller into the recovery path instead of silently blanking the app. */
+function migrateState(raw){
+  const s = JSON.parse(raw);
+  if (!isObj(s)) throw new Error("stored value is not an object");
+  if (s.version !== 1) throw new Error("unsupported stored version: " + JSON.stringify(s.version));
+  for (const k of STATE_ARRAYS) {
+    if (s[k] === undefined || s[k] === null) { s[k] = []; continue; }
+    if (!Array.isArray(s[k])) throw new Error(`stored "${k}" is not a list`);
+  }
+  s.settings = isObj(s.settings) ? s.settings : {};
+  delete s.settings.scoring;
+  s.tasks = s.tasks.filter(isObj);
+  for (const t of s.tasks) { delete t.score; delete t.score_override; }   // scoring was removed in v1.2
+  if (!s.domains.length) s.domains = clone(DEFAULT_DOMAINS);
+  return s;
+}
+
+let S, SAVED_JSON = null, RECOVERY = null;
 function loadState(){
+  let raw = null;
+  try { raw = localStorage.getItem(STORE_KEY); } catch (e) { console.error(e); }
+  if (raw == null) { SAVED_JSON = JSON.stringify(blankState()); return blankState(); }  // first run
   try {
-    const s = JSON.parse(localStorage.getItem(STORE_KEY));
-    if (s && s.version === 1) {
-      for (const k of ["domains","projects","tasks","notes","attachments","research"]) s[k] = s[k] || [];
-      s.settings = s.settings || {}; delete s.settings.scoring;
-      for (const t of s.tasks) { delete t.score; delete t.score_override; }   // scoring was removed in v1.2
-      if (!s.domains.length) s.domains = clone(DEFAULT_DOMAINS);
-      return s;
-    }
-  } catch(e) { console.error(e); }
-  return blankState();
+    const s = migrateState(raw);
+    SAVED_JSON = raw;
+    return s;
+  } catch (e) {
+    /* P0-3: never replace unreadable data with an empty app. Copy the raw string aside,
+       keep it in memory, and refuse to write until the user has acknowledged. */
+    console.error("TaskApp: stored data could not be read —", e);
+    const at = nowUtc(), key = `${STORE_KEY}.recover-${at.replace(/[:.]/g, "-")}`;
+    let copied = false;
+    try { localStorage.setItem(key, raw); copied = true; } catch (e2) { console.error("TaskApp: could not copy damaged data", e2); }
+    RECOVERY = { raw, key: copied ? key : null, at, reason: e.message, ack: false };
+    SAVED_JSON = JSON.stringify(blankState());
+    return blankState();
+  }
 }
-let S = loadState();
+S = loadState();
+
+/* ---- persistent banner ---- */
+function showBanner(id, kind, html, actions = [], dismissable = true){
+  const box = $("#banner"); if (!box) return;
+  box.className = "banner " + kind;
+  box.dataset.bannerId = id;
+  box.innerHTML = `<div class="banner-txt">${html}</div><div class="banner-acts">${
+    actions.map(a => `<button class="btn sm" data-act="${esc(a.act)}">${esc(a.label)}</button>`).join("")
+  }${dismissable ? `<button class="btn sm" data-banner-dismiss="${esc(id)}">Dismiss</button>` : ""}</div>`;
+}
+function clearBanner(id){
+  const b = $("#banner"); if (!b) return;
+  if (id && b.dataset.bannerId !== id) return;
+  b.className = "banner hidden"; b.innerHTML = ""; b.dataset.bannerId = "";
+}
+function biggestAttachment(){
+  let big = null;
+  for (const a of S.attachments) { const n = (a.data_url || "").length; if (!big || n > big.n) big = { n, a }; }
+  return big && big.n ? big : null;
+}
+function quotaDetail(){
+  const big = biggestAttachment();
+  return big
+    ? `The largest attachment is “${big.a.file_name}” (${fmtSize(big.n)} of stored text, ${fmtSize(big.a.size_bytes || 0)} file). Removing it frees the most space.`
+    : `Remove some tasks or notes, or export a backup and start a fresh browser profile.`;
+}
+
+function showRecoveryBanner(){
+  if (!RECOVERY) return;
+  showBanner("recovery", "error",
+    `<b>Your saved data could not be read.</b> ${RECOVERY.key
+      ? `Nothing has been overwritten — a copy of the unreadable data is kept in this browser as <code>${esc(RECOVERY.key)}</code>. Download it, then choose what to do.`
+      : `Nothing has been overwritten, but a backup copy could not be written (browser storage is full). Download the damaged data now.`}`
+    + ` <span class="small">(${esc(RECOVERY.reason)})</span>`,
+    [{ label: "Download damaged data", act: "recoverDownload" },
+     { label: "Start fresh (keep the copy)", act: "recoverFresh" }],
+    false);
+}
+/* P0-2: a write is all-or-nothing. If the browser refuses it, the in-memory state is
+   rolled back to the last blob that actually reached storage, so the UI can never show a
+   phantom that disappears on reload (9 call sites used to ignore the return value). */
 function save(){
-  try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); return true; }
-  catch(e) { toast("Could not save — browser storage is full. Remove large attachments or export a backup.", true); return false; }
+  if (RECOVERY && !RECOVERY.ack) {                   // never overwrite damaged data silently
+    try { if (SAVED_JSON) S = JSON.parse(SAVED_JSON); } catch (e) {}
+    showRecoveryBanner(); render();                  // no phantom edits while the store is blocked
+    return false;
+  }
+  let json;
+  try { json = JSON.stringify(S); }
+  catch (e) { toast("Could not serialise your data: " + e.message, true); return false; }
+  try {
+    localStorage.setItem(STORE_KEY, json);
+    SAVED_JSON = json;
+    clearBanner("save");
+    if (json.length > QUOTA_WARN)
+      showBanner("quota", "warn",
+        `<b>Browser storage is ${Math.round(json.length / QUOTA_CEILING * 100)}% full.</b> ${esc(quotaDetail())}`,
+        [{ label: "Export a backup now", act: "export" }]);
+    return true;
+  } catch (e) {
+    let reverted = false;
+    try { if (SAVED_JSON) { S = JSON.parse(SAVED_JSON); reverted = true; } } catch (e2) {}
+    showBanner("save", "error",
+      `<b>Not saved — browser storage is full.</b> Nothing was lost: the change has been rolled back. ${esc(quotaDetail())}`,
+      [{ label: "Export a backup now", act: "export" }]);
+    toast("Not saved — storage is full. The change was rolled back.", true);
+    if (reverted) render();
+    return false;
+  }
 }
+function saveFailed(){ return !!( $("#banner") && $("#banner").dataset.bannerId === "save" ); }
 window.addEventListener("storage", e => {
-  if (e.key === STORE_KEY) { S = loadState(); render(); }
+  if (e.key === STORE_KEY && !RECOVERY) { S = loadState(); render(); }
   if (e.key === "taskapp.theme" && e.newValue) { document.documentElement.dataset.theme = e.newValue; updateThemeBtn(); if (ui.view === "settings") render(); }
 });
 
@@ -1367,7 +1477,10 @@ function readProjectForm(){
 }
 
 function renderSettings(main){
-  const used = (localStorage.getItem(STORE_KEY) || "").length * 2;
+  const usedChars = (localStorage.getItem(STORE_KEY) || "").length;
+  const usedPct = Math.round(usedChars / QUOTA_CEILING * 100);
+  const recoverKeys = [];
+  try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith(STORE_KEY + ".recover-")) recoverKeys.push(k); } } catch (e) {}
   main.innerHTML = `
   <div class="section"><h3>Appearance</h3>
     <p class="muted small">Pick a theme. You can also switch any time with the theme button in the header or by pressing <kbd>t</kbd>.</p>
@@ -1378,8 +1491,8 @@ function renderSettings(main){
     <div id="domEditor">${domainEditorHtml()}</div>
   </div>
   <div class="section"><h3>Backup &amp; data</h3>
-    <p class="muted small">Your tasks are stored in <b>this browser only</b> (about ${fmtSize(used)} used of roughly 5 MB). Clearing browser data erases them,
-      so export a backup regularly — for example into your Google Drive folder. The export file also imports into the full SQLite TaskApp.</p>
+    <p class="muted small">Your tasks are stored in <b>this browser only</b> (${(usedChars/1048576).toFixed(2)} MB of text used — ${usedPct}% of the ~5 MB browser limit).
+      Clearing browser data erases them, so export a backup regularly — for example into your Google Drive folder. The export file also imports into the full SQLite TaskApp.</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn primary" data-act="export">Export backup (.json)</button>
       <button class="btn" data-act="import">Import / merge backup</button>
@@ -1387,6 +1500,7 @@ function renderSettings(main){
       <button class="btn danger" data-act="reset">Erase everything</button>
     </div>
     <p class="muted small" id="lastExport">${localStorage.getItem("taskapp.lastExport") ? "Last export: " + fmtWhen(localStorage.getItem("taskapp.lastExport")) : "No export yet."}</p>
+    ${recoverKeys.length ? `<p class="small" style="color:var(--danger-fg)">Kept copies of unreadable data: ${recoverKeys.map(k => `<code>${esc(k)}</code>`).join(", ")}. Download them before clearing site data.</p>` : ""}
   </div>
   <div class="section"><h3>Quick-add shortcuts</h3>
     <p class="small"><code>!high</code> <code>!med</code> <code>!low</code> priority · <code>#church</code> domain (other #words become tags) · <code>@Fall</code> project (start of the name) ·
@@ -1574,7 +1688,7 @@ function act(name, el){
         r.log.push({id:uuid(), body, created_at:nowUtc()}); r.updated_at = nowUtc();
         save(); render(); reopenTopic(d.id); toast("Study session logged"); break; }
       case "taskForTopic": {
-        const r = updateTopic(d.id, readTopicForm()); save(); closeDrawer();
+        const r = updateTopic(d.id, readTopicForm()); if (!save()) break; closeDrawer();
         openTask(null, {research_id:r.id, domain_id:r.domain_id || fallbackDomain("technical"), project_id:null, title:""}); break; }
       case "taskInProject": { const pid = d.id; closeDrawer(); openTask(null, {project_id:pid, domain_id:projectById(pid).domain_id}); break; }
       case "manageDomains": ui.domDelete = null; openDomains(); break;
@@ -1590,6 +1704,18 @@ function act(name, el){
       case "export": {
         download(`taskapp-backup-${todayStr()}.json`, JSON.stringify(exportData(), null, 2));
         localStorage.setItem("taskapp.lastExport", nowUtc()); render(); break; }
+      case "recoverDownload": {
+        if (!RECOVERY) break;
+        download(`taskapp-damaged-${RECOVERY.at.replace(/[:.]/g, "-")}.txt`, RECOVERY.raw, "text/plain");
+        toast("Damaged data downloaded"); break; }
+      case "recoverFresh": {
+        if (!RECOVERY) break;
+        const kept = RECOVERY.key ? `A copy is kept in this browser as “${RECOVERY.key}”.` : "No copy could be kept — download it first if you have not.";
+        if (!confirm(`Start with an empty app? ${kept} This is the only way TaskApp will write again.`)) break;
+        RECOVERY.ack = true;
+        S = blankState(); SAVED_JSON = JSON.stringify(S);
+        if (save()) { render(); clearBanner("recovery"); toast("Started fresh — the damaged copy was kept"); }
+        break; }
       case "reset":
         if (confirm("Erase ALL tasks, projects and settings in this browser? Export a backup first if unsure.") && confirm("Really erase everything?")) { S = blankState(); commit("Everything erased"); }
         break;
@@ -1621,6 +1747,8 @@ $("#quick").addEventListener("keydown", e => {
   } catch (err) { toast(err.message, true); }
 });
 document.addEventListener("click", e => {
+  const bd = e.target.closest("[data-banner-dismiss]");
+  if (bd) { e.preventDefault(); clearBanner(bd.dataset.bannerDismiss); return; }
   const a = e.target.closest("[data-act]"); if (a) { e.preventDefault(); act(a.dataset.act, a); return; }
   if (justDragged) return;
   const card = e.target.closest(".card[data-id]"); if (card) { openTask(card.dataset.id); return; }
@@ -1688,7 +1816,7 @@ document.addEventListener("change", e => {
       const id = ui.drawer.id;
       S.attachments.push({id:uuid(), task_id:id, file_name:safeName(file.name), mime_type:file.type || "application/octet-stream", size_bytes:file.size, data_url:r.result, created_at:nowUtc()});
       taskById(id).updated_at = nowUtc();
-      if (!save()) { S.attachments.pop(); return; }
+      if (!save()) return;                      // save() has already rolled S back
       render(); reopenTask(id); toast("Attached");
     };
     r.readAsDataURL(file);
@@ -1812,6 +1940,7 @@ document.addEventListener("contextmenu", e => { if (e.target.closest(".board .ca
 /* ------------------------------------------------------------------ start */
 updateThemeBtn();
 render();
+if (RECOVERY) showRecoveryBanner();
 // refresh due-date labels when the day changes or the tab comes back
 let lastDay = todayStr();
 setInterval(() => { if (todayStr() !== lastDay) { lastDay = todayStr(); render(); } }, 60000);
