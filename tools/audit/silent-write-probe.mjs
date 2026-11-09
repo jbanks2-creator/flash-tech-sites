@@ -79,6 +79,7 @@ const after = await page.evaluate(() => ({
   notes: S.notes.length,
   tasks: S.tasks.length,
   attachments: S.attachments.length,
+  bannerId: document.querySelector("#banner").dataset.bannerId || null,
   bannerVisible: !document.querySelector("#banner").classList.contains("hidden"),
 }));
 
@@ -92,7 +93,7 @@ const checks = {
   banner_is_error: attempt.bannerId === "save" && /error/.test(attempt.bannerClass || ""),
   banner_names_attachment: /holiday-photo\.jpg/.test(attempt.bannerText || ""),
   nothing_lost_after_reload: after.notes === 0 && after.tasks === fill.capacityTasks + 1 && after.attachments === 1,
-  banner_still_visible_after_reload: after.bannerVisible === false, // banner is per-session; data state is what matters
+  no_stale_save_banner_after_reload: after.bannerId !== "save",   // the failure banner is per-session; the data is what persists
 };
 const failed = Object.entries(checks).filter(([, v]) => !v).map(([k]) => k);
 console.log("### capacity\n" + JSON.stringify(fill, null, 2));
