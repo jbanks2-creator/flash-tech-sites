@@ -11,7 +11,10 @@
 :root, [data-theme=dark]{
   color-scheme:dark;
   --bg:#0f1115; --panel:#161a21; --card:#1d222b; --card2:#232937; --border:#2a3140; --text:#e6e8ee; --muted:#9aa3b2;
-  --accent:#4f8cff; --accent2:#3b6fd6; --on-accent:#fff; --danger:#ef4444; --warn:#f59e0b; --ok:#22c55e; --on-ok:#06210f;
+  /* P1-5: white on #4f8cff measured 3.22:1 (needs 4.5). The accent stays as-is for text
+     and links (5.87:1 on --bg); the label on an accent background switches to a dark navy,
+     which is 5.82:1. */
+  --accent:#4f8cff; --accent2:#6ea8ff; --on-accent:#0b1220; --danger:#ef4444; --warn:#f59e0b; --ok:#22c55e; --on-ok:#06210f;
   --hover-bd:#3a4356; --header-bg:rgba(15,17,21,.95); --shadow:rgba(0,0,0,.4); --shadow-strong:rgba(0,0,0,.5); --scrim:rgba(0,0,0,.45);
   --danger-fg:#fca5a5; --danger-bd:#5b2323; --danger-bg:#2a1515; --ok-fg:#86efac; --ok-bd:#1f5134; --info-fg:#93c5fd; --info-bd:#27406b;
   --high-fg:#fecaca; --high-bd:#6b2525; --medium-fg:#fde68a; --medium-bd:#6b5017; --low-fg:#cbd5e1; --tag-fg:#c4b5fd; --tag-bd:#3b2f63;
@@ -314,6 +317,18 @@ details.grp .rows{margin-top:6px}
    ===================================================================== */
 
 const STORE_KEY = "taskapp.v1";
+/* Three separate version numbers, on purpose — the audit found them disagreeing:
+   APP_VERSION is what a buyer sees and what the changelog tracks; EXPORT_FORMAT_VERSION
+   is the shape of the JSON file (bump only when the format changes); STORE_SCHEMA_VERSION
+   is the shape of the localStorage blob (bump only with a migration in migrateState).
+   "taskapp.v1" keeps its name because renaming the key would orphan existing buyers. */
+const APP_VERSION = "1.0.0-beta.2";
+const EXPORT_FORMAT_VERSION = 1;
+const STORE_SCHEMA_VERSION = 1;
+/* Filled in by ops when the support address is decided. Until then the honest answer is
+   "the address on your purchase receipt" — inventing one would put a dead mailbox in a
+   paid product. */
+const SUPPORT_CONTACT = "";
 const STATUSES = [["todo","To Do"],["in_progress","In Progress"],["blocked","Blocked"],["completed","Completed"]];
 const STATUS_LABEL = Object.fromEntries(STATUSES);
 const PRIORITIES = ["low","medium","high"];
@@ -403,7 +418,7 @@ const STATE_ARRAYS = ["domains","projects","tasks","notes","attachments","resear
 // Measured ceiling in Chromium is 5,242,632 characters stored (§1.1 of the audit).
 const QUOTA_CEILING = 5240000;
 const QUOTA_WARN = 4400000;              // ~84%: warn while the user can still act
-function blankState(){ return {version:1, domains:clone(DEFAULT_DOMAINS), projects:[], tasks:[], notes:[], attachments:[], research:[], settings:{}}; }
+function blankState(){ return {version:STORE_SCHEMA_VERSION, domains:clone(DEFAULT_DOMAINS), projects:[], tasks:[], notes:[], attachments:[], research:[], settings:{}}; }
 
 /* Every load goes through this. Version 1 is the only on-disk format; the scoring fields
    from the ancestor app are dropped. Throws when the blob is not a usable state, which is
@@ -411,7 +426,7 @@ function blankState(){ return {version:1, domains:clone(DEFAULT_DOMAINS), projec
 function migrateState(raw){
   const s = JSON.parse(raw);
   if (!isObj(s)) throw new Error("stored value is not an object");
-  if (s.version !== 1) throw new Error("unsupported stored version: " + JSON.stringify(s.version));
+  if (s.version !== STORE_SCHEMA_VERSION) throw new Error("unsupported stored version: " + JSON.stringify(s.version));
   for (const k of STATE_ARRAYS) {
     if (s[k] === undefined || s[k] === null) { s[k] = []; continue; }
     if (!Array.isArray(s[k])) throw new Error(`stored "${k}" is not a list`);
@@ -764,7 +779,7 @@ function openDomains(){
       <p class="muted small" style="margin-top:0">Domains group your tasks, projects and research. Rename or recolor one by editing it here; use ↑ ↓ to change the order they appear in.</p>
       <div id="domEditor">${domainEditorHtml()}</div>
     </div>
-    <div class="df"><button class="btn primary" data-act="close">Done</button></div>`);
+    <div class="df"><button class="btn primary" data-act="close">Done</button></div>`, "Domains");
   if (wasOpen) $("#drawer .db").scrollTop = sc;
 }
 // Re-draw whichever domain editor is visible (drawer or Settings) after a change.
@@ -874,7 +889,7 @@ function exportData(){
     task_tags.push({task_id:t.id, tag_id:tagIds.get(key).id});
   }
   return {
-    format:"taskapp-export", version:1, app_version:"html-1.5", exported_at:nowUtc(),
+    format:"taskapp-export", version:EXPORT_FORMAT_VERSION, app_version:APP_VERSION, exported_at:nowUtc(),
     domains: clone(S.domains), projects: clone(S.projects),
     tasks: S.tasks.map(t => { const o = clone(t); delete o.tags; return o; }),
     notes: clone(S.notes), tags:[...tagIds.values()], task_tags,
@@ -920,7 +935,7 @@ function importData(data){
   if (!isObj(data)) throw new Error("Not a TaskApp export file");
   if (data.format !== "taskapp-export") throw new Error("Not a TaskApp export file");
   if (!Number.isInteger(data.version)) throw new Error("Import rejected — the file has no version field, so it is not a TaskApp export. Nothing was changed.");
-  if (data.version > 1) throw new Error(`Export is from a newer TaskApp version (${data.version}). Nothing was changed.`);
+  if (data.version > EXPORT_FORMAT_VERSION) throw new Error(`Export is from a newer TaskApp version (format ${data.version}). Nothing was changed.`);
   if (data.version < 1) throw new Error(`Export version ${data.version} is not supported. Nothing was changed.`);
   for (const k of EXPORT_ARRAYS)
     if (data[k] !== undefined && !Array.isArray(data[k]))
@@ -1121,19 +1136,40 @@ function loadSample(){
   for (const d of DEFAULT_DOMAINS) if (!domainById(d.id)) S.domains.push({...clone(d), sort_order: Math.max(0, ...S.domains.map(x => x.sort_order)) + 1});
   const keys = {}, today = todayStr();
   const rkeys = {};
+  // Idempotent: a second click must not append 27 more copies (audit §7.5).
+  const haveTopics = new Set(S.research.filter(r => r.sample).map(r => r.name));
+  const haveProjects = new Set(S.projects.filter(p => p.sample).map(p => p.name));
+  const haveTasks = new Set(S.tasks.filter(t => t.sample).map(t => t.title));
   for (const r of SAMPLE_RESEARCH) {
-    rkeys[r.key] = createTopic({name:r.name, status:r.status, level:r.level, tags:r.tags, body:r.body,
+    if (haveTopics.has(r.name)) { rkeys[r.key] = S.research.find(x => x.sample && x.name === r.name).id; continue; }
+    rkeys[r.key] = createTopic({name:r.name, status:r.status, level:r.level, tags:r.tags, body:r.body, sample:true,
       links: r.links.map(l => ({id:uuid(), ...l})),
       log: r.log.map(e => ({id:uuid(), body:e.body, created_at:new Date(Date.now() + e.days*864e5).toISOString()}))}).id;
   }
-  for (const [k,name,dom,crit,due,desc] of SAMPLE.projects)
-    keys[k] = createProject({name, domain_id:dom, criticality:crit, description:desc, due_date: due==null ? null : addDays(today, due)}).id;
+  for (const [k,name,dom,crit,due,desc] of SAMPLE.projects) {
+    if (haveProjects.has(name)) { keys[k] = S.projects.find(x => x.sample && x.name === name).id; continue; }
+    keys[k] = createProject({name, domain_id:dom, criticality:crit, description:desc, sample:true, due_date: due==null ? null : addDays(today, due)}).id;
+  }
   for (const [title,pk,dom,prio,status,due,rec="none",tags=[],note] of SAMPLE.tasks) {
-    const t = createTask({title, project_id: pk ? keys[pk] : null, domain_id: dom, priority:prio, status, due_date: due==null ? null : addDays(today, due), recurrence:rec, tags});
+    if (haveTasks.has(title)) continue;
+    const t = createTask({title, project_id: pk ? keys[pk] : null, domain_id: dom, priority:prio, status, sample:true, source:"sample", due_date: due==null ? null : addDays(today, due), recurrence:rec, tags});
     if (note) addNote(note, {task_id:t.id});
   }
   const links = {"Learn Go basics":"go", "Upgrade Proxmox host":"pve"};
   for (const t of S.tasks) if (links[t.title] && !t.research_id) t.research_id = rkeys[links[t.title]];
+}
+const sampleCounts = () => ({
+  tasks: S.tasks.filter(t => t.sample).length,
+  projects: S.projects.filter(p => p.sample).length,
+  topics: S.research.filter(r => r.sample).length,
+});
+function removeSample(){
+  const ids = new Set(S.tasks.filter(t => t.sample).map(t => t.id));
+  S.tasks = S.tasks.filter(t => !t.sample);
+  S.notes = S.notes.filter(n => !(n.task_id && ids.has(n.task_id)));
+  S.attachments = S.attachments.filter(a => !(a.task_id && ids.has(a.task_id)));
+  S.projects = S.projects.filter(p => !p.sample);
+  S.research = S.research.filter(r => !r.sample);
 }
 
 /* ------------------------------------------------------------------ quick add parser */
@@ -1490,7 +1526,7 @@ function openTopic(id, mode){
       <button class="btn primary" data-act="saveTopic">${isNew ? "Create topic" : "Save"}</button>
       <div class="grow"></div>
       ${!isNew ? `<button class="btn danger" data-act="deleteTopic">Delete topic</button>` : ""}
-    </div>`);
+    </div>`, isNew ? "New research topic" : "Research topic: " + r.name);
 }
 function readTopicForm(){
   return {name:$("#r_name").value, status:$("#r_status").value, level:parseInt($("#r_level").value, 10), domain_id:$("#r_domain").value || null,
@@ -1521,7 +1557,9 @@ function renderSettings(main){
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn primary" data-act="export">Export backup (.json)</button>
       <button class="btn" data-act="import">Import / merge backup</button>
-      <button class="btn" data-act="sample">Add sample data</button>
+      ${(() => { const c = sampleCounts(); return c.tasks + c.projects + c.topics === 0
+        ? `<button class="btn" data-act="sample">Add sample data</button>`
+        : `<button class="btn" data-act="removeSample">Remove sample data (${c.tasks} tasks, ${c.projects} projects, ${c.topics} topics)</button>`; })()}
       <button class="btn danger" data-act="reset">Erase everything</button>
     </div>
     <p class="muted small" id="lastExport">${localStorage.getItem("taskapp.lastExport") ? "Last export: " + fmtWhen(localStorage.getItem("taskapp.lastExport")) : "No export yet."}</p>
@@ -1530,15 +1568,56 @@ function renderSettings(main){
   <div class="section"><h3>Quick-add shortcuts</h3>
     <p class="small"><code>!high</code> <code>!med</code> <code>!low</code> priority · <code>#church</code> domain (other #words become tags) · <code>@Fall</code> project (start of the name) ·
     <code>due:today</code> <code>due:tomorrow</code> <code>due:fri</code> <code>due:+3</code> <code>due:11/15</code> <code>due:2026-11-15</code> · <code>every:week</code> repeat</p>
+  </div>
+  <div class="section"><h3>About</h3>
+    <p class="small" style="margin-top:0"><b>TaskApp ${APP_VERSION}</b> · single-file edition</p>
+    <p class="muted small">One HTML file. No install, no account, no network — this app makes no requests at all and collects nothing.
+      Your tasks never leave this browser.</p>
+    <p class="muted small">Licensed, not sold — see the EULA supplied with your purchase. Support: ${SUPPORT_CONTACT
+      ? `<a href="mailto:${esc(SUPPORT_CONTACT)}">${esc(SUPPORT_CONTACT)}</a>`
+      : "the address on your purchase receipt"}.</p>
+    <p class="muted small">Version ${APP_VERSION} · export format ${EXPORT_FORMAT_VERSION} · storage schema ${STORE_SCHEMA_VERSION}
+      (the storage key keeps the name <code>${STORE_KEY}</code> so existing data is never orphaned).</p>
   </div>`;
 }
 
 /* ------------------------------------------------------------------ drawers */
-function openDrawer(html){
-  const d = $("#drawer"); d.innerHTML = html; d.classList.remove("hidden"); $("#scrim").classList.remove("hidden");
+let lastOpener = null;
+// Serialised form state, used for two things: the dirty check on close (P1-8) and nothing
+// else — it deliberately ignores file inputs, which cannot be restored.
+function drawerFormState(){
+  const d = $("#drawer");
+  return JSON.stringify($$("input,select,textarea", d)
+    .filter(e => e.type !== "file")
+    .map(e => [e.id || e.dataset.k || e.tagName, e.value ?? ""]));
+}
+function drawerHasUnsavedChanges(){
+  return !!(ui.drawer && ui.drawerDirty != null && drawerFormState() !== ui.drawerDirty);
+}
+function openDrawer(html, label){
+  const d = $("#drawer"), wasOpen = !d.classList.contains("hidden");
+  if (!wasOpen) lastOpener = document.activeElement;
+  d.innerHTML = html; d.classList.remove("hidden"); $("#scrim").classList.remove("hidden");
+  d.setAttribute("role", "dialog");
+  d.setAttribute("aria-modal", "true");
+  if (label) d.setAttribute("aria-label", label);
+  ui.drawerDirty = drawerFormState();
   setTimeout(() => d.querySelector("[autofocus]")?.focus(), 30);
 }
-function closeDrawer(){ ui.domDelete = null; $("#drawer").classList.add("hidden"); $("#scrim").classList.add("hidden"); ui.drawer = null; }
+function closeDrawer(){
+  ui.domDelete = null;
+  $("#drawer").classList.add("hidden"); $("#scrim").classList.add("hidden");
+  ui.drawer = null; ui.drawerDirty = null;
+  if (lastOpener && document.contains(lastOpener) && typeof lastOpener.focus === "function") { try { lastOpener.focus(); } catch (e) {} }
+  lastOpener = null;
+}
+// The three user-initiated close paths (×, scrim, Escape) go through this, so a typed but
+// unsaved edit is never thrown away without a question.
+function tryCloseDrawer(){
+  if (!ui.drawer) return closeDrawer();
+  if (drawerHasUnsavedChanges() && !confirm("Discard your unsaved changes in this panel?")) return;
+  closeDrawer();
+}
 const opt = (v, label, sel) => `<option value="${esc(v)}" ${v === sel ? "selected" : ""}>${esc(label)}</option>`;
 function domainOptions(sel, withNew){ return sortedDomains().map(d => opt(d.id, d.name, sel)).join("") + (withNew ? `<option value="__new">+ New domain…</option>` : ""); }
 function projectOptions(sel){ return `<option value="">— none (standalone) —</option>` + S.projects.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(p => opt(p.id, p.name + (p.status==="done"?" (done)":""), sel)).join(""); }
@@ -1585,7 +1664,7 @@ function openTask(id, preset={}){
       ${!isNew && t.status !== "completed" ? `<button class="btn" data-act="completeTask">✓ Mark done</button>` : ""}
       <div class="grow"></div>
       ${!isNew ? `<button class="btn danger" data-act="deleteTask">Delete</button>` : ""}
-    </div>`);
+    </div>`, isNew ? "New task" : "Task: " + t.title);
   $("#f_project").addEventListener("change", e => { const p = projectById(e.target.value); if (p) $("#f_domain").value = p.domain_id; });
 }
 function readTaskForm(){
@@ -1627,7 +1706,7 @@ function openProject(id){
       <button class="btn primary" data-act="saveProject">${isNew ? "Create project" : "Save"}</button>
       <div class="grow"></div>
       ${!isNew ? `<button class="btn danger" data-act="deleteProject">Delete project</button>` : ""}
-    </div>`);
+    </div>`, isNew ? "New project" : "Project: " + p.name);
 }
 
 /* ------------------------------------------------------------------ actions */
@@ -1636,8 +1715,18 @@ function act(name, el){
   const d = ui.drawer;
   try {
     switch (name) {
-      case "close": closeDrawer(); break;
-      case "sample": loadSample(); commit("Sample data loaded"); break;
+      case "close": tryCloseDrawer(); break;
+      case "sample": {
+        const already = sampleCounts();
+        if (already.tasks >= SAMPLE.tasks.length && already.projects >= SAMPLE.projects.length && already.topics >= SAMPLE_RESEARCH.length) {
+          toast("Sample data is already loaded — Settings → Remove sample data clears it"); break;
+        }
+        if (hasUserData() && !confirm(`Add example data to your existing ${S.tasks.length} task${S.tasks.length === 1 ? "" : "s"}? Up to ${SAMPLE.tasks.length} tasks, ${SAMPLE.projects.length} projects and ${SAMPLE_RESEARCH.length} research topics will be added. They are tagged, so Settings → “Remove sample data” deletes exactly them.`)) break;
+        loadSample(); commit("Sample data loaded — remove it any time from Settings"); break; }
+      case "removeSample": {
+        const c = sampleCounts();
+        if (!confirm(`Remove sample data? ${c.tasks} tasks, ${c.projects} projects and ${c.topics} research topics will be deleted. Rows you created yourself are untouched.`)) break;
+        removeSample(); commit("Sample data removed"); break; }
       case "import": $("#importFile").click(); break;
       case "newProject": openProject(null); break;
       case "saveTask": {
@@ -1755,7 +1844,7 @@ $("#tabs").addEventListener("click", e => { const b = e.target.closest("button")
 $("#newTask").onclick = () => openTask(null);
 $("#themeBtn").onclick = cycleTheme;
 $("#newProject").onclick = () => openProject(null);
-$("#scrim").onclick = closeDrawer;
+$("#scrim").onclick = tryCloseDrawer;
 $("#search").addEventListener("input", e => { ui.q = e.target.value; if (ui.view === "settings" || ui.view === "projects") ui.view = "board"; render(); if (ui.view === "home") $("#search").focus(); });
 $("#filters").addEventListener("click", e => { const c = e.target.closest("[data-domain]"); if (!c) return; ui.domain = c.dataset.domain || null; if (ui.project && ui.project !== "__none" && ui.domain && projectById(ui.project)?.domain_id !== ui.domain) ui.project = ""; render(); });
 $("#filters").addEventListener("change", e => { if (e.target.id === "projFilter") { ui.project = e.target.value; render(); } });
@@ -1885,7 +1974,7 @@ $("#importFile").addEventListener("change", e => {
 });
 document.addEventListener("keydown", e => {
   const typing = e.target.closest("input,textarea,select");
-  if (e.key === "Escape") { if (!$("#drawer").classList.contains("hidden")) closeDrawer(); else if (typing) e.target.blur(); return; }
+  if (e.key === "Escape") { if (!$("#drawer").classList.contains("hidden")) tryCloseDrawer(); else if (typing) e.target.blur(); return; }
   if (typing) { if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && ui.drawer) act({task:"saveTask", project:"saveProject", topic:"saveTopic"}[ui.drawer.type]); return; }
   if (e.key === "n") { e.preventDefault(); ui.view === "research" ? openTopic(null) : openTask(null); }
   else if (e.key === "/") { e.preventDefault(); $("#search").focus(); }
