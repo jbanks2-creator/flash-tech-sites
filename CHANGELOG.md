@@ -31,9 +31,11 @@ and export format v1 are unchanged**, so backups from rc.1 and rc.2 restore here
   checksum-of-backup workflow was impossible. Tag ids are now derived from the tag name
   (`tag-<slug>`, with a deterministic suffix only if two names slug alike), so the same
   data exports identical content. The one remaining difference between two exports is the
-  `exported_at` timestamp; the README, the help panel and Settings say so and give the
-  one-line `jq` command that drops it before hashing. Imports still match tags by name, so
-  files written by rc.2 and earlier load unchanged.
+  `exported_at` timestamp — a single line in the pretty-printed file — so deleting that one
+  line makes two exports of unchanged data byte-identical (verified with two real
+  22,591-byte exports a second apart: same sha256 after the deletion). The README, the help
+  panel and Settings say so. Imports still match tags by name, so files written by rc.2 and
+  earlier load unchanged.
 - **m6 — a record changed in another tab is announced, not overwritten silently.** The
   storage listener still reloads the whole state (that is what keeps edits to *different*
   rows safe), and now also watches the record the open panel is editing: with nothing

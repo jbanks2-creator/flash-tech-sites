@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-C1ragFL4qO1xRsx2YWNY3bWj3bFTjO9OAvmQjQ+/1KA=' 'sha256-EqBU/p/2qcmohIOZydV8Ifk4XZRvsq+ub0tm1H4XBs8='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'none'; base-uri 'none'; object-src 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-C1ragFL4qO1xRsx2YWNY3bWj3bFTjO9OAvmQjQ+/1KA=' 'sha256-3lmT+j2MOssBeOYPKBeNdIDue5AoGo0QpVmgIza+PVI='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'none'; base-uri 'none'; object-src 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>TaskApp — tasks, projects and clients</title>
 <meta name="description" content="A task, project and client manager in one HTML file. No account, no cloud, no network: your data never leaves this device.">
@@ -2788,7 +2788,7 @@ function renderSettings(main){
   <div class="section"><h3>Backup &amp; data</h3>
     <p class="muted small">Your tasks are stored in <b>this browser only</b> (${(usedChars/1048576).toFixed(2)} MB of text used — ${usedPct}% of the ~5 MB browser limit).
       Clearing browser data erases them, so export a backup regularly — for example into your Google Drive folder. The export file also imports into the full SQLite TaskApp.</p>
-    <p class="muted small">Exports are reproducible: tag ids are derived from the tag name, so the same data exports identically apart from the one <code>exported_at</code> timestamp. To checksum a backup, remove that line first (<code>jq -S 'del(.exported_at)' backup.json | sha256sum</code>) and compare with a later export of unchanged data.</p>
+    <p class="muted small">Exports are reproducible: tag ids are derived from the tag name, so the same data exports the same bytes apart from the single <code>exported_at</code> line (when you clicked Export). Delete that one line and two exports of unchanged data are byte-identical — so a checksum of a backup means something.</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn primary" data-act="export">Export backup (.json)</button>
       <button class="btn" data-act="import">Import / merge backup</button>

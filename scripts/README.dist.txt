@@ -39,11 +39,10 @@ Import  Settings → Import / merge backup. Same ids are updated, new ones added
         nothing is deleted. A safety copy of your current data downloads first.
 The export file opens in any text editor, so your data is never locked in.
 
-The export is reproducible: tag ids are derived from the tag name, so the same data
-always exports the same content. The only line that changes between two exports is
-"exported_at". To keep a checksum of a backup, drop that line first:
-
-  jq -S 'del(.exported_at)' taskapp-backup-2026-11-09.json | sha256sum
+The export is reproducible: tag ids are derived from the tag name, so the same data always
+exports the same bytes — with one exception, the single "exported_at" line that records
+when you clicked Export. Delete that one line and two exports of unchanged data are
+byte-identical, so a checksum of your backup means something.
 
 Two tabs on the same browser share this data. Working on different tasks in two tabs is
 safe. If you have one task open in both and the other tab saves it first, the panel tells
