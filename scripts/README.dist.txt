@@ -8,7 +8,8 @@ installer, no account, no server.
 HOW TO OPEN IT
 --------------
 1. Save TaskApp-@VERSION@.html anywhere you keep things — your Documents folder is fine.
-2. Double-click it. It opens in Chrome, Edge, Firefox or Safari.
+2. Double-click it. It opens in a Chromium-based browser — Chrome, Microsoft Edge, Brave,
+   Opera or Vivaldi. Firefox and Safari are untested in this release, so use one of those.
 3. That is the whole install. It works offline, on a plane, with the Wi-Fi switched off.
 
 Tip: drag the file to your bookmarks bar, or right-click it and "Send to desktop",
@@ -37,6 +38,16 @@ Export  Settings → Export backup (.json). One file, readable text, yours.
 Import  Settings → Import / merge backup. Same ids are updated, new ones added,
         nothing is deleted. A safety copy of your current data downloads first.
 The export file opens in any text editor, so your data is never locked in.
+
+The export is reproducible: tag ids are derived from the tag name, so the same data
+always exports the same content. The only line that changes between two exports is
+"exported_at". To keep a checksum of a backup, drop that line first:
+
+  jq -S 'del(.exported_at)' taskapp-backup-2026-11-09.json | sha256sum
+
+Two tabs on the same browser share this data. Working on different tasks in two tabs is
+safe. If you have one task open in both and the other tab saves it first, the panel tells
+you the record changed underneath and asks before overwriting it.
 
 
 PRINTING AND PDF

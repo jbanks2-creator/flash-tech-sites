@@ -2,6 +2,66 @@
 
 All notable changes to TaskApp. Versioning is semver for the single-file product.
 
+## [1.0.0-rc.3] — 2026-11-09
+
+Polish on top of the shipped build: the five minors that two rounds of independent
+hostile-buyer QA left open (card `t_ac713c63`, reports
+`businesses/flash-apps/docs/taskapp-qa-report.md` §3 and `…-round2.md` §3), plus the
+browser claim in the buyer README. None was a blocker; **`taskapp.v1`, the storage schema
+and export format v1 are unchanged**, so backups from rc.1 and rc.2 restore here.
+
+### Fixed
+
+- **m2 — every view is on screen at 375 px.** The tab strip used to scroll sideways with no
+  cue: Research sat at `[346..432]` and Settings at `[436..516]` on a 375 px viewport, and
+  Settings is where Export and Import live. Under 620 px the strip now wraps into
+  full-width rows — seven tabs, all visible, each still 44 px tall, no horizontal scroll.
+- **m3 — List view no longer widens a phone.** Its ~398 px table used to push the layout
+  viewport to 409 px at 375, so Chrome zoomed the page to ~91% and switching views
+  re-flowed every other view's text. The table now scrolls inside its own wrapper
+  (`overflow-x: auto`), the page keeps the device width, and print still lays the table
+  out full width.
+- **m4 — refresh or close-tab mid-edit asks first.** The panel's three close paths already
+  asked; the browser's own did not, and typed text was lost silently. A `beforeunload`
+  guard now prompts when an open panel holds unsaved input, and never when it does not.
+  Mobile browsers may suppress that prompt, so the in-app close paths keep asking and
+  Ctrl/Cmd+Enter still saves.
+- **m5 — a backup is reproducible.** `exportData()` minted a fresh UUID for every tag on
+  every export, so two exports of untouched data differed (10 changed tag ids) and a
+  checksum-of-backup workflow was impossible. Tag ids are now derived from the tag name
+  (`tag-<slug>`, with a deterministic suffix only if two names slug alike), so the same
+  data exports identical content. The one remaining difference between two exports is the
+  `exported_at` timestamp; the README, the help panel and Settings say so and give the
+  one-line `jq` command that drops it before hashing. Imports still match tags by name, so
+  files written by rc.2 and earlier load unchanged.
+- **m6 — a record changed in another tab is announced, not overwritten silently.** The
+  storage listener still reloads the whole state (that is what keeps edits to *different*
+  rows safe), and now also watches the record the open panel is editing: with nothing
+  typed it simply shows the newer version, and with unsaved text it shows a "Changed in
+  another tab" notice with a "Load the other tab's version" button, and the Save button
+  asks before replacing the other tab's change. A record deleted in the other tab closes
+  the panel with a toast.
+
+### Changed
+
+- `README.txt` (the file the buyer reads first) no longer claims Firefox and Safari: this
+  release is built and tested in Chromium — Chrome, Edge, Brave, Opera or Vivaldi — and
+  the README, the in-app help and the FAQ now say the same thing.
+- Settings → Backup and the help panel spell out backup determinism and what happens with
+  two tabs open.
+
+### Verified
+
+- New probe `tools/audit/m2-m6-probe.mjs`: measures the 375 px tab strip and List view
+  geometry, asserts `document.scrollWidth === 375` in every view, proves the `beforeunload`
+  guard fires only with unsaved input, compares two exports of unchanged data after
+  dropping `exported_at` (byte-identical), and drives the two-tab same-record case
+  (notice shown, save asks, cancel keeps the typed text, confirm replaces).
+- Buyer QA harness re-run against the built artifact (`TASKAPP_URL`): `qa-data` D6/D7
+  (unload guard present, draft ref used), D8a/D8b (cross-tab: both edits persist), D9
+  (`bytes_identical: true`), `qa-mobile2` (all seven tabs on screen at 375, `scrollWidth`
+  375 in Board and List), plus `qa-rt`, `qa-sec`, `qa-sec2`, `qa-ux`, `qa-final`.
+
 ## [1.0.0-rc.2] — 2026-11-09
 
 Backup restore, fixed. The two blockers and one minor from the independent hostile-buyer QA

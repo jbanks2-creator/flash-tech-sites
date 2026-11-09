@@ -32,6 +32,10 @@ Consequences a buyer must understand before relying on it:
   of any blob it cannot read.
 - **A container does not add a database.** The nginx container below exists only to
   serve `index.html` over HTTP. It has no volume, no DB, no server-side code.
+- **Chromium only, as tested.** The product is built and verified in Chromium (Chrome,
+  Edge, Brave, Opera, Vivaldi) at desktop and phone widths, over `http://` and `file://`.
+  Firefox and Safari are untested in this release, and the buyer README, the in-app help
+  and the store FAQ all say so.
 
 ## What a buyer gets
 
@@ -212,6 +216,7 @@ $P node tools/audit/undo-probe.mjs            http://127.0.0.1:3601/   # P1-9
 $P node tools/audit/csp-probe.mjs             http://127.0.0.1:3601/   # P2-1 + no-network
 $P node tools/audit/scale-probe.mjs           http://127.0.0.1:3601/   # P1-2 timings
 $P node tools/audit/restore-domains-probe.mjs http://127.0.0.1:3601/   # restore B1/B2/m1
+$P node tools/audit/m2-m6-probe.mjs           http://127.0.0.1:3601/   # m2–m6 (375px, unload guard, export determinism, two tabs)
 $P node tools/audit/file-protocol-probe.mjs   index.html              # file:// + migration
 node tools/audit/csp-hash.mjs index.html                              # CSP drift check
 node scripts/embed-demo.mjs --check                                   # demo drift check
@@ -222,7 +227,8 @@ node scripts/embed-demo.mjs --check                                   # demo dri
 Read `businesses/flash-apps/docs/taskapp-readiness-audit.md` in the org repo before
 selling or deploying this to anyone who will put real data in it. Still open and
 deliberately out of scope for this pass: IndexedDB attachments (the 1.5 MB limit stays),
-custom dialogs replacing `confirm()`/`prompt()`, multi-tab merge,
+custom dialogs replacing `confirm()`/`prompt()`, a real merge of the *same* record across
+tabs (it is now announced and confirmed instead of silently overwritten),
 `prefers-color-scheme`/reduced motion, and search inside notes. `SUPPORT_CONTACT` in
 `index.html` is blank until `ops` decides the address; the app points at the purchase
 receipt.
@@ -232,7 +238,7 @@ receipt.
 ```
 index.html                  the product (single file)
 demo-data.json              the demo workspace (taskapp-export v1); embedded into index.html
-VERSION                     1.0.0-rc.2
+VERSION                     1.0.0-rc.3
 LICENSE                     licence-not-sale statement, points at the EULA
 CHANGELOG.md                what changed, per version
 scripts/build.sh            dist artifact + checksum + README.txt (deterministic)
