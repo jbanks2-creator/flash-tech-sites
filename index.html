@@ -363,6 +363,11 @@ const RESEARCH_STATUSES = [["explore","To explore"],["learning","Learning"],["us
 const RSTATUS_LABEL = Object.fromEntries(RESEARCH_STATUSES);
 const LEVELS = ["Not started","Aware of it","Basics","Working knowledge","Proficient","Expert"];
 const MAX_ATTACHMENT = 1.5 * 1024 * 1024;
+/* P1-2: at 5,000 tasks the DOM was 33k–60k nodes and Board took 760 ms. Only what a
+   person can actually see is rendered; "show more" raises the cap on demand. */
+const BOARD_PAGE = 60;        // cards per board column
+const LIST_PAGE = 200;        // rows in the list view
+const HOME_GROUP_PAGE = 50;   // rows per group on the dashboard
 
 const DEFAULT_DOMAINS = [
   {id:"business", name:"Business", weight:1.3, color:"#3b82f6", sort_order:1},
@@ -563,7 +568,7 @@ window.addEventListener("storage", e => {
   if (e.key === "taskapp.theme" && e.newValue) { document.documentElement.dataset.theme = e.newValue; updateThemeBtn(); if (ui.view === "settings") render(); }
 });
 
-const ui = { view: "home", entryType: localStorage.getItem("taskapp.entryType") || "task", homeOpen: new Set(JSON.parse(localStorage.getItem("taskapp.homeOpen") || "[]")), domain: null, project: "", q: "", drawer: null, rstatus: "", rtag: "", mdMode: "edit" };
+const ui = { view: "home", entryType: localStorage.getItem("taskapp.entryType") || "task", homeOpen: new Set(JSON.parse(localStorage.getItem("taskapp.homeOpen") || "[]")), domain: null, project: "", q: "", drawer: null, rstatus: "", rtag: "", mdMode: "edit", colLimit: {}, listLimit: LIST_PAGE };
 
 /* ------------------------------------------------------------------ lookups */
 const domainById = id => S.domains.find(d => d.id === id);
@@ -718,10 +723,22 @@ function deleteProject(id){
   S.notes = S.notes.filter(n => n.project_id !== id);
   for (const t of S.tasks) if (t.project_id === id) { t.project_id = null; t.updated_at = nowUtc(); }
 }
+function projectStatsAll(){
+  if (statsAll) return statsAll;
+  const m = new Map();
+  for (const t of S.tasks) {
+    if (t.archived_at) continue;
+    const k = t.project_id || "";
+    let c = m.get(k); if (!c) { c = {counts:{todo:0,in_progress:0,blocked:0,completed:0}, total:0}; m.set(k, c); }
+    if (c.counts[t.status] !== undefined) c.counts[t.status]++;
+    c.total++;
+  }
+  for (const c of m.values()) c.progress = c.total ? c.counts.completed / c.total : 0;
+  statsAll = m; return m;
+}
+// One pass per render, not one filter per project (that was O(projects x tasks)).
 function projectStats(id){
-  const ts = S.tasks.filter(t => t.project_id === id && !t.archived_at);
-  const c = {todo:0, in_progress:0, blocked:0, completed:0}; ts.forEach(t => c[t.status]++);
-  return {counts:c, total:ts.length, progress: ts.length ? c.completed / ts.length : 0};
+  return projectStatsAll().get(id) || {counts:{todo:0, in_progress:0, blocked:0, completed:0}, total:0, progress:0};
 }
 
 /* ------------------------------------------------------------------ domains */
@@ -1227,7 +1244,9 @@ function parseDue(v){
 
 /* ------------------------------------------------------------------ rendering */
 const VIEW_LABELS = {home:"Home", focus:"Focus", board:"Board", list:"List", projects:"Projects", research:"Research", settings:"Settings"};
+let statsAll = null;
 function render(){
+  statsAll = null;
   $$("#tabs button").forEach(b => {
     const on = b.dataset.view === ui.view;
     b.classList.toggle("on", on);
@@ -1258,9 +1277,11 @@ function dueBadge(t){
   const cls = t.status === "completed" ? "" : diff < 0 ? "over" : diff <= 2 ? "soon" : "";
   return `<span class="badge ${cls}" title="Due ${esc(t.due_date)}">📅 ${esc(fmtDue(t.due_date))}</span>`;
 }
-function cardHtml(t){
+function cardHtml(t, ctx){
   const d = domainById(t.domain_id), p = t.project_id ? projectById(t.project_id) : null;
-  const nNotes = S.notes.filter(n => n.task_id === t.id).length, nAtt = attachmentsFor(t.id).length;
+  // counts come from one pass over notes/attachments per render, not one filter per card
+  const nNotes = ctx ? (ctx.notes.get(t.id) || 0) : S.notes.filter(n => n.task_id === t.id).length;
+  const nAtt = ctx ? (ctx.atts.get(t.id) || 0) : attachmentsFor(t.id).length;
   return `<div class="card ${t.status==="completed"?"done":""}" data-id="${esc(t.id)}" tabindex="0" role="button" aria-label="${esc(t.title)} — ${esc(STATUS_LABEL[t.status] || t.status)}, ${esc(t.priority)} priority" style="--c:${esc(d?.color||"#888")}">
     <div class="t">${esc(t.title)}</div>
     <div class="meta">
@@ -1313,7 +1334,9 @@ function hrowHtml(t){
     <span class="meta">${t.status === "in_progress" && !done ? '<span class="badge hide-sm" style="color:var(--info-fg)">in progress</span>' : ""}${t.status === "blocked" ? '<span class="badge hide-sm" style="color:var(--danger-fg)">blocked</span>' : ""}<span class="badge ${t.priority}">${t.priority}</span>${dueBadge(t)}${p ? `<span class="badge hide-sm">▸ ${esc(p.name)}</span>` : ""}</span>
   </div>`;
 }
-const rowsOr = (list, empty) => list.length ? list.map(hrowHtml).join("") : `<div class="hnone">${empty}</div>`;
+const rowsOr = (list, empty) => list.length
+  ? list.slice(0, HOME_GROUP_PAGE).map(hrowHtml).join("") + (list.length > HOME_GROUP_PAGE ? `<div class="hnone">+${list.length - HOME_GROUP_PAGE} more — open the List or Board to see the rest</div>` : "")
+  : `<div class="hnone">${empty}</div>`;
 function panel(title, count, body, more){
   return `<section class="panel"><h3>${title}${count !== null ? `<span class="n">${count}</span>` : ""}${more ? `<span class="more">${more}</span>` : ""}</h3>${body}</section>`;
 }
@@ -1361,15 +1384,23 @@ function renderHome(main){
   const byDomain = sortedDomains().map(d => {
     const ts = open.filter(t => t.domain_id === d.id).sort(byImportance);
     if (!ts.length) return "";
+    const shown = ts.slice(0, HOME_GROUP_PAGE);
     return `<details class="grp" data-hdom="${esc(d.id)}" ${ui.homeOpen.has(d.id) || ui.q ? "open" : ""}><summary><span class="dot" style="--c:${esc(d.color)}"></span><b>${esc(d.name)}</b><span class="muted small">${ts.length} open</span></summary>
-      <div class="rows">${ts.map(hrowHtml).join("")}</div></details>`;
+      <div class="rows">${shown.map(hrowHtml).join("")}${ts.length > shown.length ? `<div class="hnone">+${ts.length - shown.length} more — open the List or Board</div>` : ""}</div></details>`;
   }).join("");
 
+  // next due date per project in one pass (was O(projects x tasks))
+  const nextByProject = new Map();
+  for (const t of S.tasks) {
+    if (t.status === "completed" || !t.due_date || t.archived_at || !t.project_id) continue;
+    const cur = nextByProject.get(t.project_id);
+    if (!cur || t.due_date < cur) nextByProject.set(t.project_id, t.due_date);
+  }
   const projHtml = projects.length ? projects.map(p => {
     const st = projectStats(p.id), d = domainById(p.domain_id);
-    const next = S.tasks.filter(t => t.project_id === p.id && t.status !== "completed" && t.due_date && !t.archived_at).sort((a,b) => a.due_date.localeCompare(b.due_date))[0];
+    const nextDue = nextByProject.get(p.id);
     return `<div class="hitem" data-open-project="${esc(p.id)}" style="--c:${esc(d?.color)}"><span class="name" title="${esc(p.name)}">${esc(p.name)}</span>
-      ${next ? `<span class="muted small hide-sm">next ${esc(fmtDue(next.due_date))}</span>` : ""}<span class="muted small">${st.counts.completed}/${st.total}</span><span class="mini"><i style="width:${Math.round(st.progress*100)}%"></i></span></div>`;
+      ${nextDue ? `<span class="muted small hide-sm">next ${esc(fmtDue(nextDue))}</span>` : ""}<span class="muted small">${st.counts.completed}/${st.total}</span><span class="mini"><i style="width:${Math.round(st.progress*100)}%"></i></span></div>`;
   }).join("") : `<div class="hnone">No active projects.</div>`;
 
   const topicHtml = topics.length ? topics.slice(0, 8).map(r => {
@@ -1424,20 +1455,25 @@ function addFromQuick(raw){
 function renderBoard(main){
   const tasks = visibleTasks();
   if (!S.tasks.length) { main.innerHTML = emptyHtml(); return; }
+  const ctx = { notes: new Map(), atts: new Map() };
+  for (const n of S.notes) ctx.notes.set(n.task_id, (ctx.notes.get(n.task_id) || 0) + 1);
+  for (const a of S.attachments) ctx.atts.set(a.task_id, (ctx.atts.get(a.task_id) || 0) + 1);
   main.innerHTML = `<div class="board">${STATUSES.map(([s,label]) => {
     const col = tasks.filter(t => t.status === s).sort((a,b) => a.position - b.position);
+    const limit = Math.max(BOARD_PAGE, ui.colLimit[s] || 0), shown = col.slice(0, limit), hidden = col.length - shown.length;
     return `<section class="col" data-status="${s}" role="region" aria-label="${esc(label)} — ${col.length} task${col.length === 1 ? "" : "s"}"><h3>${label}<span class="n">${col.length}</span></h3>
-      <div class="list">${col.map(cardHtml).join("")}</div></section>`;
+      <div class="list">${shown.map(t => cardHtml(t, ctx)).join("")}${hidden ? `<button class="btn sm" data-morecol="${s}">Show ${Math.min(BOARD_PAGE, hidden)} more · ${hidden} hidden</button>` : ""}</div></section>`;
   }).join("")}</div>
-  <p class="muted small" style="margin-top:14px">Drag cards between columns (on a phone: press and hold, then drag). Click a card to edit. <kbd>n</kbd> new task · <kbd>/</kbd> search · <kbd>t</kbd> theme · <kbd>Esc</kbd> close</p>`;
+  <p class="muted small" style="margin-top:14px">Drag cards between columns (on a phone: press and hold, then drag). Click a card to edit. Keyboard: <kbd>Tab</kbd> to a card, <kbd>Enter</kbd> opens it, <kbd>Ctrl</kbd>+<kbd>←</kbd>/<kbd>→</kbd> moves it between columns, <kbd>Ctrl</kbd>+<kbd>↑</kbd>/<kbd>↓</kbd> reorders. <kbd>n</kbd> new task · <kbd>/</kbd> search · <kbd>t</kbd> theme · <kbd>Esc</kbd> close</p>`;
 }
 function emptyHtml(){
   return `<div class="empty"><h2>No tasks yet</h2><p>Add one with <b>+ Task</b> or the quick-add box, or start with example data.</p>
     <p><button class="btn primary" data-act="sample">Load sample data</button> <button class="btn" data-act="import">Import a backup</button></p></div>`;
 }
 function renderList(main){
-  const tasks = visibleTasks().filter(t => t.status !== "completed" || ui.q).sort(byImportance);
+  const all = visibleTasks().filter(t => t.status !== "completed" || ui.q).sort(byImportance);
   if (!S.tasks.length) { main.innerHTML = emptyHtml(); return; }
+  const tasks = all.slice(0, ui.listLimit), hidden = all.length - tasks.length;
   main.innerHTML = `<table><thead><tr><th>Task</th><th class="hide-sm">Domain</th><th class="hide-sm">Project</th><th>Status</th><th class="hide-sm">Priority</th><th>Due</th></tr></thead><tbody>
     ${tasks.map(t => { const d = domainById(t.domain_id), p = projectById(t.project_id); return `<tr class="row" data-id="${esc(t.id)}" tabindex="0">
       <td><b>${esc(t.title)}</b> ${t.recurrence!=="none"?"🔁":""}</td>
@@ -1447,6 +1483,7 @@ function renderList(main){
       <td class="hide-sm"><span class="badge ${t.priority}">${t.priority}</span></td>
       <td>${dueBadge(t) || '<span class="muted">—</span>'}</td></tr>`; }).join("")}
   </tbody></table>
+  ${hidden ? `<p><button class="btn sm" data-morelist>Show ${Math.min(LIST_PAGE, hidden)} more · ${hidden} hidden</button></p>` : ""}
   <p class="muted small">Open tasks, highest priority first, then soonest due. Completed tasks are hidden unless you search.</p>`;
 }
 function renderFocus(main){
@@ -1936,7 +1973,18 @@ $("#newTask").onclick = () => openTask(null);
 $("#themeBtn").onclick = cycleTheme;
 $("#newProject").onclick = () => openProject(null);
 $("#scrim").onclick = tryCloseDrawer;
-$("#search").addEventListener("input", e => { ui.q = e.target.value; if (ui.view === "settings" || ui.view === "projects") ui.view = "board"; render(); if (ui.view === "home") $("#search").focus(); });
+let searchTimer = null;
+$("#search").addEventListener("input", e => {
+  const v = e.target.value;
+  clearTimeout(searchTimer);
+  // Debounced: a full re-render per keystroke is the wrong shape at 5,000 tasks.
+  searchTimer = setTimeout(() => {
+    ui.q = v; ui.listLimit = LIST_PAGE;
+    if (ui.view === "settings" || ui.view === "projects") ui.view = "board";
+    render();
+    if (ui.view === "home") $("#search").focus();
+  }, 120);
+});
 $("#filters").addEventListener("click", e => { const c = e.target.closest("[data-domain]"); if (!c) return; ui.domain = c.dataset.domain || null; if (ui.project && ui.project !== "__none" && ui.domain && projectById(ui.project)?.domain_id !== ui.domain) ui.project = ""; render(); });
 $("#filters").addEventListener("change", e => { if (e.target.id === "projFilter") { ui.project = e.target.value; render(); } });
 $("#quick").addEventListener("keydown", e => {
@@ -1956,6 +2004,10 @@ document.addEventListener("click", e => {
   if (bd) { e.preventDefault(); if (bd.dataset.bannerDismiss === "backup") { try { sessionStorage.setItem("taskapp.nudgeDismissed", todayStr()); } catch (err) {} } clearBanner(bd.dataset.bannerDismiss); return; }
   const a = e.target.closest("[data-act]"); if (a) { e.preventDefault(); act(a.dataset.act, a); return; }
   if (justDragged) return;
+  // "show more" in a board column / the list view
+  const mc = e.target.closest("[data-morecol]");
+  if (mc) { const s = mc.dataset.morecol; ui.colLimit[s] = Math.max(BOARD_PAGE, ui.colLimit[s] || 0) + BOARD_PAGE; render(); return; }
+  if (e.target.closest("[data-morelist]")) { ui.listLimit += LIST_PAGE; render(); return; }
   // remember what opened the drawer, so focus can go back there on close (P1-3)
   setOpener(e.target.closest(".card[data-id], .hrow[data-id], tr.row[data-id], .pcard[data-pid], .rcard[data-rid], .hitem[data-open-project], .hitem[data-open-topic], [data-opentask]"));
   const card = e.target.closest(".card[data-id]"); if (card) { openTask(card.dataset.id); return; }
