@@ -2,10 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-C1ragFL4qO1xRsx2YWNY3bWj3bFTjO9OAvmQjQ+/1KA=' 'sha256-B4eFukQkNIe4CkxGFbk9Pd4edlHaSDx5OoMlypQ9GpM='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'none'; base-uri 'none'; object-src 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-C1ragFL4qO1xRsx2YWNY3bWj3bFTjO9OAvmQjQ+/1KA=' 'sha256-4EbevMnTkHNAbLhUAcirlOtFh9An4sHXhVM4fMhJEaM='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'none'; base-uri 'none'; object-src 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>TaskApp</title>
-<link rel="icon" href="data:,">
+<title>TaskApp — tasks, projects and clients</title>
+<meta name="description" content="A task, project and client manager in one HTML file. No account, no cloud, no network: your data never leaves this device.">
+<meta name="application-name" content="TaskApp">
+<meta name="theme-color" content="#0f1115">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%234f8cff'/%3E%3Cpath d='M18 33.5l9 9L46 21' fill='none' stroke='%230b1220' stroke-width='7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%234f8cff'/%3E%3Cpath d='M18 33.5l9 9L46 21' fill='none' stroke='%230b1220' stroke-width='7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <script>try { document.documentElement.dataset.theme = localStorage.getItem("taskapp.theme") || "dark"; } catch (e) { document.documentElement.dataset.theme = "dark"; }</script>
 <style>
 /* ---------- themes: Dark (default), Light, Midnight ---------- */
@@ -303,12 +307,113 @@ details.grp .rows{margin-top:6px}
   .hide-sm{display:none}
   table .hide-sm{display:none}
 }
+
+/* =====================================================================
+   Product surfaces: version, DEMO label, welcome / help / licence panels
+   ===================================================================== */
+.brand{display:flex;align-items:center;gap:8px}
+.brand .ver{font-size:11px;font-weight:500;color:var(--muted);letter-spacing:.02em;white-space:nowrap}
+.demo-pill{font-size:10px;font-weight:700;letter-spacing:.08em;padding:2px 6px;border-radius:4px;
+  background:var(--soon-bg);color:var(--soon-fg);border:1px solid var(--soon-bd)}
+.brand .demo-pill{color:var(--soon-fg)}
+#helpBtn{min-width:36px;padding:6px 10px;font-weight:600}
+@media (max-width:900px),(pointer:coarse){ #helpBtn{min-width:44px} }
+/* Between 900 and 1440 the header cannot hold brand + version + 7 tabs + search + five
+   buttons on one row. + Project is the cheapest thing to drop: it is duplicated on the
+   Projects view and in Home's entry switcher, while the version must stay visible. */
+@media (max-width:1439px){ #newProject{display:none} }
+
+/* the demo notice sits above the view, so it survives every render without using the
+   one-slot system banner (a quota error must never be replaced by a demo label) */
+.demo-note{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:space-between;
+  background:var(--soon-bg);border:1px solid var(--soon-bd);color:var(--soon-fg);
+  border-radius:10px;padding:8px 12px;margin:0 0 12px;font-size:12.5px;line-height:1.45}
+.demo-note b{letter-spacing:.04em}
+.demo-note .btn{background:transparent;border-color:currentColor;color:inherit}
+
+/* first-run welcome */
+.welcome{max-width:560px;margin:0 auto;padding:8px 2px 4px}
+.welcome h2{margin:10px 0 4px;font-size:20px}
+.wmark{width:44px;height:44px;border-radius:12px;background:var(--accent);color:var(--on-accent);
+  display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700}
+.wcards{display:grid;gap:10px;margin:18px 0 16px}
+.wcard{display:block;width:100%;text-align:left;background:var(--card);color:var(--text);
+  border:1px solid var(--border);border-radius:12px;padding:14px 16px;font:inherit;cursor:pointer}
+.wcard:hover{border-color:var(--accent)}
+.wcard b{display:block;font-size:14.5px;margin-bottom:3px}
+.wcard span{display:block;color:var(--muted);font-size:12.5px;line-height:1.45}
+
+/* help + licence panels */
+.help h4,.lic h4{margin:18px 0 6px}
+.help p,.lic p{font-size:13px;line-height:1.55}
+.kbd-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.kbd-table td{padding:6px 4px;border-bottom:1px solid var(--border);vertical-align:top}
+.kbd-table td:first-child{width:38%;white-space:nowrap}
+kbd{background:var(--card2);border:1px solid var(--border);border-bottom-width:2px;border-radius:4px;
+  padding:1px 5px;font:inherit;font-size:11.5px}
+.lic-status{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.badge.ok{background:var(--ok-bg,var(--card2));color:var(--ok-fg);border:1px solid var(--ok-bd)}
+
+/* =====================================================================
+   Print — a sheet, not a screenshot of a dark UI (card item 4)
+   Every theme is overridden to a light palette; chrome is dropped and a
+   print-only heading names the view, the filter and the date.
+   ===================================================================== */
+#printHead{display:none}
+.printonly{display:none}
+@media print{
+  @page{ margin:14mm 12mm; }
+  html,body{ background:#fff !important; color:#111827 !important;
+    print-color-adjust:exact; -webkit-print-color-adjust:exact; }
+  :root, html[data-theme=dark], html[data-theme=light], html[data-theme=midnight]{
+    color-scheme:light;
+    --bg:#fff; --panel:#fff; --card:#fff; --card2:#f3f4f6; --border:#c7ced9; --text:#111827; --muted:#4b5563;
+    --accent:#1d4ed8; --accent2:#1d4ed8; --on-accent:#fff; --danger:#b91c1c; --warn:#92400e; --ok:#15803d; --on-ok:#fff;
+    --hover-bd:#c7ced9; --header-bg:#fff; --shadow:none; --shadow-strong:none; --scrim:transparent;
+    --danger-fg:#991b1b; --danger-bd:#fca5a5; --danger-bg:#fff1f1; --ok-fg:#166534; --ok-bd:#86efac; --info-fg:#1e40af; --info-bd:#bfdbfe;
+    --high-fg:#991b1b; --high-bd:#fca5a5; --medium-fg:#92400e; --medium-bd:#fcd34d; --low-fg:#374151; --tag-fg:#5b21b6; --tag-bd:#ddd6fe;
+    --over-bg:#fee2e2; --over-bd:#b91c1c; --over-fg:#7f1d1d; --soon-bg:#fef3c7; --soon-bd:#b45309; --soon-fg:#78350f;
+    --chk-bd:#9aa6b8; --code-bg:#f3f4f6;
+  }
+  header,.quick,#filters,#banner,.demo-note,#scrim,#drawer,.toasts,#toasts,
+  #newProject,#newTask,#themeBtn,#helpBtn,.search,.x,.acts,.seg,.showmore,
+  .legend,.muted.small.help,button{ display:none !important; }
+  main{padding:0 !important;max-width:none !important}
+  #printHead{display:block;border-bottom:2px solid #111827;margin:0 0 12px;padding-bottom:6px}
+  #printHead h1{font-size:15pt;margin:0 0 2px;font-weight:700}
+  #printHead .meta{font-size:9pt;color:#374151}
+  .printonly{display:inline}
+  .noprint{display:none !important}
+  /* the 900px phone breakpoint also matches paper width, so restore the columns it drops */
+  table .hide-sm{display:table-cell !important}
+  .board{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .col{break-inside:avoid;page-break-inside:avoid;border:1px solid #c7ced9;border-radius:8px;padding:8px 10px}
+  .col h3{font-size:11pt;margin:0 0 6px;border-bottom:1px solid #c7ced9;padding-bottom:4px}
+  .col .list{display:block}
+  .card{break-inside:avoid;page-break-inside:avoid;border:1px solid #d7dde6;border-left:3px solid #6b7280;
+    border-radius:6px;padding:6px 8px;margin:0 0 6px;background:#fff}
+  .card .t{font-size:10pt;font-weight:600}
+  .badge{border:1px solid #c7ced9;background:#fff;color:#111827;font-size:8pt;padding:0 4px}
+  .badge.over,.badge.soon{border-color:#b91c1c;color:#7f1d1d;background:#fee2e2}
+  .fcard{break-inside:avoid;page-break-inside:avoid;border:1px solid #c7ced9;border-left:3px solid #6b7280;border-radius:8px;padding:10px 12px;background:#fff}
+  .fcard .rank{font-size:9pt;color:#4b5563}
+  .fcard .t{font-size:12pt;font-weight:700;margin:2px 0 4px}
+  table{width:100%;border-collapse:collapse;font-size:10pt}
+  table th{text-align:left;border-bottom:2px solid #111827;padding:4px 6px;font-size:8.5pt;text-transform:uppercase;letter-spacing:.04em}
+  tr.row td{border-bottom:1px solid #d7dde6;padding:5px 6px;vertical-align:top}
+  tr.row{break-inside:avoid;page-break-inside:avoid}
+  select{appearance:none;border:0;background:transparent;color:#111827;font:inherit;padding:0}
+  .prog{background:#e5e7eb;height:6px;border-radius:99px;overflow:hidden}
+  .prog i{background:#1d4ed8;display:block;height:100%}
+  a{color:#1d4ed8;text-decoration:none}
+  .empty{border:1px dashed #c7ced9}
+}
 </style>
 </head>
 <body>
 <header>
   <div class="bar">
-    <div class="brand">Task<span>App</span></div>
+    <div class="brand">Task<span>App</span><span class="ver" id="brandVer"></span><span class="demo-pill hidden" id="demoPill">DEMO</span></div>
     <nav class="tabs" id="tabs" role="tablist" aria-label="Views">
       <button data-view="home" role="tab" aria-selected="true">Home</button>
       <button data-view="focus" role="tab" aria-selected="false">Focus</button>
@@ -320,6 +425,8 @@ details.grp .rows{margin-top:6px}
     </nav>
     <div class="grow"></div>
     <input id="search" class="search" type="search" placeholder="Search tasks  ( / )">
+    <button class="btn hide-sm" id="printBtn" title="Print this view (Ctrl+P)" aria-label="Print this view">🖨</button>
+    <button class="btn" id="helpBtn" title="How it works and keyboard shortcuts (?)" aria-label="Help and keyboard shortcuts">?</button>
     <button class="btn" id="themeBtn" title="Switch theme"></button>
     <button class="btn" id="newProject">+ Project</button>
     <button class="btn primary" id="newTask">+ Task</button>
@@ -334,6 +441,7 @@ details.grp .rows{margin-top:6px}
 <div id="scrim" class="scrim hidden"></div>
 <aside id="drawer" class="drawer hidden"></aside>
 <input type="file" id="importFile" accept=".json,application/json" class="hidden">
+<input type="file" id="licenceFile" accept=".json,.txt,.key,application/json,text/plain" class="hidden">
 
 <script>
 "use strict";
@@ -349,7 +457,7 @@ const STORE_KEY = "taskapp.v1";
    is the shape of the JSON file (bump only when the format changes); STORE_SCHEMA_VERSION
    is the shape of the localStorage blob (bump only with a migration in migrateState).
    "taskapp.v1" keeps its name because renaming the key would orphan existing buyers. */
-const APP_VERSION = "1.0.0-beta.2";
+const APP_VERSION = "1.0.0-rc.1";
 const EXPORT_FORMAT_VERSION = 1;
 const STORE_SCHEMA_VERSION = 1;
 /* Filled in by ops when the support address is decided. Until then the honest answer is
@@ -471,11 +579,11 @@ function migrateState(raw){
   return s;
 }
 
-let S, SAVED_JSON = null, RECOVERY = null;
+let S, SAVED_JSON = null, RECOVERY = null, FIRST_RUN = false;
 function loadState(){
   let raw = null;
   try { raw = localStorage.getItem(STORE_KEY); } catch (e) { console.error(e); }
-  if (raw == null) { SAVED_JSON = JSON.stringify(blankState()); return blankState(); }  // first run
+  if (raw == null) { FIRST_RUN = true; SAVED_JSON = JSON.stringify(blankState()); return blankState(); }  // first run
   try {
     const s = migrateState(raw);
     SAVED_JSON = raw;
@@ -1217,6 +1325,933 @@ function removeSample(){
   S.research = S.research.filter(r => !r.sample);
 }
 
+/* ------------------------------------------------------------------ demo workspace
+   `demo-data.json` in the repo is the canonical file: a real "taskapp-export" v1 payload
+   for a fictional IT services company, and the same artifact the website demo loads. The
+   copy embedded below is byte-equivalent in meaning and is what runs at load time, because
+   the app makes no requests at all (connect-src 'none') — there is nothing to fetch from.
+   `scripts/embed-demo.mjs --check` (called by scripts/build.sh) fails the build if the two
+   ever drift, so "separate file + embedded fallback" cannot silently disagree.
+
+   Due dates in the file are absolute and carry a top-level `demo_anchor`. Loading shifts
+   the whole workspace by (today - anchor), so the demo keeps the same shape forever:
+   two overdue items, one due today, a week of work ahead. */
+/* DEMO_DATA:BEGIN */
+const DEMO_DATA = {
+  "format": "taskapp-export",
+  "version": 1,
+  "app_version": "1.0.0-rc.1",
+  "demo": true,
+  "demo_anchor": "2026-11-08",
+  "exported_at": "2026-11-08T20:00:00.000Z",
+  "domains": [
+    {
+      "id": "d-northgate",
+      "name": "Northgate Dental",
+      "weight": 1.4,
+      "color": "#0ea5e9",
+      "sort_order": 1
+    },
+    {
+      "id": "d-lakeside",
+      "name": "Lakeside Realty",
+      "weight": 1.2,
+      "color": "#8b5cf6",
+      "sort_order": 2
+    },
+    {
+      "id": "d-summit",
+      "name": "Summit HVAC",
+      "weight": 1.1,
+      "color": "#f59e0b",
+      "sort_order": 3
+    },
+    {
+      "id": "d-internal",
+      "name": "Internal / Ops",
+      "weight": 1.3,
+      "color": "#64748b",
+      "sort_order": 4
+    }
+  ],
+  "projects": [
+    {
+      "id": "p-northgate-network",
+      "name": "Northgate — network refresh",
+      "domain_id": "d-northgate",
+      "description": "Replace the ageing switch stack and two access points. Cutover runs after the practice closes, 6pm Tuesday.",
+      "criticality": 5,
+      "status": "active",
+      "due_date": "2026-11-26",
+      "created_at": "2026-10-15T14:05:00.000Z",
+      "updated_at": "2026-11-07T14:05:00.000Z",
+      "archived_at": null
+    },
+    {
+      "id": "p-lakeside-site",
+      "name": "Lakeside — website rebuild",
+      "domain_id": "d-lakeside",
+      "description": "New listing theme, agent pages, redirects from the old URLs. Content comes from the office manager.",
+      "criticality": 4,
+      "status": "active",
+      "due_date": "2026-12-10",
+      "created_at": "2026-10-20T14:05:00.000Z",
+      "updated_at": "2026-11-06T14:05:00.000Z",
+      "archived_at": null
+    },
+    {
+      "id": "p-summit-backup",
+      "name": "Summit — backup rollout",
+      "domain_id": "d-summit",
+      "description": "NAS plus offsite replication for the office share and the dispatch database. Test restore before sign-off.",
+      "criticality": 3,
+      "status": "active",
+      "due_date": "2026-11-20",
+      "created_at": "2026-10-27T14:05:00.000Z",
+      "updated_at": "2026-11-05T14:05:00.000Z",
+      "archived_at": null
+    },
+    {
+      "id": "p-internal-q4",
+      "name": "Q4 internal ops",
+      "domain_id": "d-internal",
+      "description": "Licences, invoicing, patching and the onboarding checklist. The work that keeps the lights on.",
+      "criticality": 2,
+      "status": "active",
+      "due_date": null,
+      "created_at": "2026-09-29T14:05:00.000Z",
+      "updated_at": "2026-11-07T14:05:00.000Z",
+      "archived_at": null
+    }
+  ],
+  "tasks": [
+    {
+      "id": "t-ng-rack",
+      "title": "Photograph server rack and label patch panel",
+      "description": "Needed before the cutover so we can put every cable back where it was.",
+      "domain_id": "d-northgate",
+      "project_id": "p-northgate-network",
+      "status": "todo",
+      "position": 1024,
+      "priority": "medium",
+      "due_date": "2026-11-05",
+      "recurrence": "none",
+      "recurrence_interval": 1,
+      "recurrence_parent_id": null,
+      "research_id": null,
+      "source": "demo",
+      "external_id": null,
+      "created_at": "2026-11-02T15:20:00.000Z",
+      "updated_at": "2026-11-07T17:30:00.000Z",
+      "completed_at": null,
+      "archived_at": null
+    },
+    {
+      "id": "t-ng-switch",
+      "title": "Order replacement 48-port switch",
+      "description": "Quote #4471 approved. Two-week lead time — order today or the cutover slips.",
+      "domain_id": "d-northgate",
+      "project_id": "p-northgate-network",
+      "status": "todo",
+      "position": 2048,
+      "priority": "high",
+      "due_date": "2026-11-07",
+      "recurrence": "none",
+      "recurrence_interval": 1,
+      "recurrence_parent_id": null,
+      "research_id": null,
+      "source": "demo",
+      "external_id": null,
+      "created_at": "2026-11-01T15:20:00.000Z",
+      "updated_at": "2026-11-07T17:30:00.000Z",
+      "completed_at": null,
+      "archived_at": null
+    },
+    {
+      "id": "t-ng-schedule",
+      "title": "Confirm after-hours cutover with the practice manager",
+      "description": "Practice closes 5:30pm. Confirm the alarm contact and who stays on site.",
+      "domain_id": "d-northgate",
+      "project_id": "p-northgate-network",
+      "status": "in_progress",
+      "position": 1024,
+      "priority": "high",
+      "due_date": "2026-11-09",
+      "recurrence": "none",
+      "recurrence_interval": 1,
+      "recurrence_parent_id": null,
+      "research_id": null,
+      "source": "demo",
+      "external_id": null,
+      "created_at": "2026-10-31T15:20:00.000Z",
+      "updated_at": "2026-11-07T17:30:00.000Z",
+      "completed_at": null,
+      "archived_at": null
+    },
+    {
+      "id": "t-ng-config",
+      "title": "Stage switch config from the running backup",
+      "description": "Restore the config to the spare switch and verify VLANs, trunks and the phone system.",
+      "domain_id": "d-northgate",
+      "project_id": "p-northgate-network",
+      "status": "todo",
+      "position": 3072,
+      "priority": "high",
+      "due_date": "2026-11-10",
+      "recurrence": "none",
+      "recurrence_interval": 1,
+      "recurrence_parent_id": null,
+      "research_id": null,
+      "source": "demo",
+      "external_id": null,
+      "created_at": "2026-10-30T15:20:00.000Z",
+      "updated_at": "2026-11-07T17:30:00.000Z",
+      "completed_at": null,
+      "archived_at": null
+    },
+    {
+      "id": "t-ng-cutover",
+      "title": "Cutover night — swap the switch stack",
+      "description": "",
+      "domain_id": "d-northgate",
+      "project_id": "p-northgate-network",
+      "status": "todo",
+      "position": 4096,
+      "priority": "high",
+      "due_date": "2026-11-18T18:00",
+      "recurrence": "none",
+      "recurrence_interval": 1,
+      "recurrence_parent_id": null,
+      "research_id": null,
+      "source": "demo",
+      "external_id": null,
+      "created_at": "2026-10-29T15:20:00.000Z",
+      "updated_at": "2026-11-07T17:30:00.000Z",
+      "completed_at": null,
+      "archived_at": null
+    },
+    {
+      "id": "t-ng-check",
+      "title": "Post-cutover check: phones, X-ray upload, Wi-Fi",
+      "description": "",
+      "domain_id": "d-northgate",
+      "project_id": "p-northgate-network",
+      "status": "todo",
+      "position": 5120,
+      "priority": "medium",
+      "due_date": "2026-11-19",
+      "recurrence": "none",
+      "recurrence_interval": 1,
+      "recurrence_parent_id": null,
+      "research_id": null,
+      "source": "demo",
+      "external_id": null,
+      "created_at": "2026-10-28T15:20:00.000Z",
+      "updated_at": "2026-11-07T17:30:00.000Z",
+      "completed_at": null,
+      "archived_at": null
+    },
+    {
+      "id": "t-ng-diagram",
+      "title": "Update the network diagram",
+      "description": "",
+      "domain_id": "d-northgate",
+      "project_id": "p-northgate-network",
+      "status": "todo",
+      "position": 6144,
+      "priority": "low",
+      "due_date": "2026-11-17",
+      "recurrence": "none",
+      "recurrence_interval": 1,
+      "recurrence_parent_id": null,
+      "research_id": null,
+      "source": "demo",
+      "external_id": null,
+      "created_at": "2026-10-27T15:20:00.000Z",
+      "updated_at": "2026-11-07T17:30:00.000Z",
+      "completed_at": null,
+      "archived_at": null
+    },
+    {
+      "id": "t-lk-theme",
+      "title": "Migrate the listings grid to the new theme",
+      "description": "Search, filters and the map panel. Keep the existing IDX widget untouched.",
+      "domain_id": "d-lakeside",
+      "project_id": "p-lakeside-site",
+      "status": "in_progress",
+      "position": 1024,
+      "priority": "medium",
+      "due_date": "2026-11-12",
+      "recurrence": "none",
+      "recurrence_interval": 1,
+      "recurrence_parent_id": null,
+      "research_id": null,
+      "source": "demo",
+      "external_id": null,
+      "created_at": "2026-10-26T15:20:00.000Z",
+      "updated_at": "2026-11-07T17:30:00.000Z",
+      "completed_at": null,
+      "archived_at": null
+    },
+    {
+      "id": "t-lk-headshots",
+      "title": "Collect agent headshots and bios",
+      "description": "",
+      "domain_id": "d-lakeside",
+      "project_id": "p-lakeside-site",
+      "status": "blocked",
+      "position": 1024,
+      "priority": "medium",
+      "due_date": "2026-11-10",
+      "recurrence": "none",
+      "recurrence_interval": 1,
+      "recurrence_parent_id": null,
+      "research_id": null,
+      "source": "demo",
+      "external_id": null,
+      "created_at": "2026-10-25T15:20:00.000Z",
+      "updated_at": "2026-11-07T17:30:00.000Z",
+      "completed_at": null,
+      "archived_at": null
+    },
+    {
+      "id": "t-lk-redirects",
+      "title": "Set up 301 redirects for the old listing URLs",
+      "description": "Every /listing/<id> URL has to land on the new page or the search rankings go with it.",
+      "domain_id": "d-lakeside",
+      "project_id": "p-lakeside-site",
+      "status": "todo",
+      "position": 2048,
+      "priority": "medium",
+      "due_date": "2026-11-16",
+      "recurrence": "none",
+      "recurrence_interval": 1,
+      "recurrence_parent_id": null,
+      "research_id": null,
+      "source": "demo",
+      "external_id": null,
+      "created_at": "2026-11-02T15:20:00.000Z",
+      "updated_at": "2026-11-07T17:30:00.000Z",
+      "completed_at": null,
+      "archived_at": null
+    },
+    {
+      "id": "t-lk-signoff",
+      "title": "Client sign-off on the homepage",
+      "description": "",
+      "domain_id": "d-lakeside",
+      "project_id": "p-lakeside-site",
+      "status": "todo",
+      "position": 3072,
+      "priority": "high",
+      "due_date": "2026-11-22",
+      "recurrence": "none",
+      "recurrence_interval": 1,
+      "recurrence_parent_id": null,
+      "research_id": null,
+      "source": "demo",
+      "external_id": null,
+      "created_at": "2026-11-01T15:20:00.000Z",
+      "updated_at": "2026-11-07T17:30:00.000Z",
+      "completed_at": null,
+      "archived_at": null
+    },
+    {
+      "id": "t-sm-audit",
+      "title": "Audit the current backup jobs",
+      "description": "",
+      "domain_id": "d-summit",
+      "project_id": "p-summit-backup",
+      "status": "completed",
+      "position": 1024,
+      "priority": "medium",
+      "due_date": null,
+      "recurrence": "none",
+      "recurrence_interval": 1,
+      "recurrence_parent_id": null,
+      "research_id": null,
+      "source": "demo",
+      "external_id": null,
+      "created_at": "2026-10-31T09:00:00.000Z",
+      "updated_at": "2026-11-05T16:40:00.000Z",
+      "completed_at": "2026-11-05T16:40:00.000Z",
+      "archived_at": null
+    },
+    {
+      "id": "t-sm-quote",
+      "title": "Quote the NAS and offsite replication",
+      "description": "4 TB usable, nightly copy to the owner's office in Denison. Include the first year of support.",
+      "domain_id": "d-summit",
+      "project_id": "p-summit-backup",
+      "status": "todo",
+      "position": 2048,
+      "priority": "high",
+      "due_date": "2026-11-09",
+      "recurrence": "none",
+      "recurrence_interval": 1,
+      "recurrence_parent_id": null,
+      "research_id": null,
+      "source": "demo",
+      "external_id": null,
+      "created_at": "2026-10-30T15:20:00.000Z",
+      "updated_at": "2026-11-07T17:30:00.000Z",
+      "completed_at": null,
+      "archived_at": null
+    },
+    {
+      "id": "t-sm-agent",
+      "title": "Install the backup agent on the office PCs",
+      "description": "",
+      "domain_id": "d-summit",
+      "project_id": "p-summit-backup",
+      "status": "todo",
+      "position": 3072,
+      "priority": "medium",
+      "due_date": "2026-11-14",
+      "recurrence": "none",
+      "recurrence_interval": 1,
+      "recurrence_parent_id": null,
+      "research_id": null,
+      "source": "demo",
+      "external_id": null,
+      "created_at": "2026-10-29T15:20:00.000Z",
+      "updated_at": "2026-11-07T17:30:00.000Z",
+      "completed_at": null,
+      "archived_at": null
+    },
+    {
+      "id": "t-sm-restore",
+      "title": "Test a restore of the accounting share",
+      "description": "Restore to a spare drive, open three files, then delete the test copy. A backup nobody restored is a hope.",
+      "domain_id": "d-summit",
+      "project_id": "p-summit-backup",
+      "status": "todo",
+      "position": 4096,
+      "priority": "high",
+      "due_date": "2026-11-15",
+      "recurrence": "none",
+      "recurrence_interval": 1,
+      "recurrence_parent_id": null,
+      "research_id": null,
+      "source": "demo",
+      "external_id": null,
+      "created_at": "2026-10-28T15:20:00.000Z",
+      "updated_at": "2026-11-07T17:30:00.000Z",
+      "completed_at": null,
+      "archived_at": null
+    },
+    {
+      "id": "t-ops-licences",
+      "title": "Renew MSP software licences",
+      "description": "RMM, PSA and the ticketing mailbox. Renews annually — check the seat count before paying.",
+      "domain_id": "d-internal",
+      "project_id": "p-internal-q4",
+      "status": "todo",
+      "position": 1024,
+      "priority": "high",
+      "due_date": "2026-11-08",
+      "recurrence": "none",
+      "recurrence_interval": 1,
+      "recurrence_parent_id": null,
+      "research_id": null,
+      "source": "demo",
+      "external_id": null,
+      "created_at": "2026-10-27T15:20:00.000Z",
+      "updated_at": "2026-11-07T17:30:00.000Z",
+      "completed_at": null,
+      "archived_at": null
+    },
+    {
+      "id": "t-ops-invoices",
+      "title": "Send this month's invoices",
+      "description": "",
+      "domain_id": "d-internal",
+      "project_id": "p-internal-q4",
+      "status": "completed",
+      "position": 2048,
+      "priority": "high",
+      "due_date": null,
+      "recurrence": "none",
+      "recurrence_interval": 1,
+      "recurrence_parent_id": null,
+      "research_id": null,
+      "source": "demo",
+      "external_id": null,
+      "created_at": "2026-10-31T09:00:00.000Z",
+      "updated_at": "2026-11-03T11:20:00.000Z",
+      "completed_at": "2026-11-03T11:20:00.000Z",
+      "archived_at": null
+    },
+    {
+      "id": "t-ops-patch",
+      "title": "Weekly patching window for client servers",
+      "description": "Sunday 2am. Patch, reboot, check the backups ran.",
+      "domain_id": "d-internal",
+      "project_id": "p-internal-q4",
+      "status": "todo",
+      "position": 3072,
+      "priority": "medium",
+      "due_date": "2026-11-10",
+      "recurrence": "weekly",
+      "recurrence_interval": 1,
+      "recurrence_parent_id": null,
+      "research_id": null,
+      "source": "demo",
+      "external_id": null,
+      "created_at": "2026-10-25T15:20:00.000Z",
+      "updated_at": "2026-11-07T17:30:00.000Z",
+      "completed_at": null,
+      "archived_at": null
+    },
+    {
+      "id": "t-ops-ssl",
+      "title": "Renew SSL certificates across client sites",
+      "description": "Six sites on the shared wildcard. Set a calendar reminder 30 days out next time.",
+      "domain_id": "d-internal",
+      "project_id": "p-internal-q4",
+      "status": "todo",
+      "position": 4096,
+      "priority": "high",
+      "due_date": "2026-11-11",
+      "recurrence": "none",
+      "recurrence_interval": 1,
+      "recurrence_parent_id": null,
+      "research_id": null,
+      "source": "demo",
+      "external_id": null,
+      "created_at": "2026-11-02T15:20:00.000Z",
+      "updated_at": "2026-11-07T17:30:00.000Z",
+      "completed_at": null,
+      "archived_at": null
+    },
+    {
+      "id": "t-ops-onboard",
+      "title": "Update the client onboarding checklist",
+      "description": "",
+      "domain_id": "d-internal",
+      "project_id": "p-internal-q4",
+      "status": "todo",
+      "position": 5120,
+      "priority": "low",
+      "due_date": null,
+      "recurrence": "none",
+      "recurrence_interval": 1,
+      "recurrence_parent_id": null,
+      "research_id": null,
+      "source": "demo",
+      "external_id": null,
+      "created_at": "2026-11-01T15:20:00.000Z",
+      "updated_at": "2026-11-07T17:30:00.000Z",
+      "completed_at": null,
+      "archived_at": null
+    },
+    {
+      "id": "t-ops-inventory",
+      "title": "Inventory the spare-parts shelf",
+      "description": "Two switches, a box of patch leads and at least one PSU that may not work.",
+      "domain_id": "d-internal",
+      "project_id": null,
+      "status": "todo",
+      "position": 6144,
+      "priority": "low",
+      "due_date": "2026-11-14",
+      "recurrence": "none",
+      "recurrence_interval": 1,
+      "recurrence_parent_id": null,
+      "research_id": null,
+      "source": "demo",
+      "external_id": null,
+      "created_at": "2026-10-31T15:20:00.000Z",
+      "updated_at": "2026-11-07T17:30:00.000Z",
+      "completed_at": null,
+      "archived_at": null
+    }
+  ],
+  "notes": [
+    {
+      "id": "n-ng-1",
+      "task_id": "t-ng-schedule",
+      "project_id": null,
+      "body": "Dana prefers Tuesdays after 6pm — the last patient leaves at 5:30. Confirmed the alarm code goes to Marcus, not to us.",
+      "created_at": "2026-11-06T10:05:00.000Z",
+      "updated_at": "2026-11-06T10:05:00.000Z"
+    },
+    {
+      "id": "n-lk-1",
+      "task_id": "t-lk-headshots",
+      "project_id": null,
+      "body": "Two of six agents have sent photos. Chased the office manager on Monday; she is waiting on the agents.",
+      "created_at": "2026-11-06T10:05:00.000Z",
+      "updated_at": "2026-11-06T10:05:00.000Z"
+    }
+  ],
+  "tags": [
+    {
+      "id": "tag-documentation",
+      "name": "documentation"
+    },
+    {
+      "id": "tag-procurement",
+      "name": "procurement"
+    },
+    {
+      "id": "tag-phone-call",
+      "name": "phone-call"
+    },
+    {
+      "id": "tag-after-hours",
+      "name": "after-hours"
+    },
+    {
+      "id": "tag-dev",
+      "name": "dev"
+    },
+    {
+      "id": "tag-waiting-on",
+      "name": "waiting-on"
+    },
+    {
+      "id": "tag-seo",
+      "name": "seo"
+    },
+    {
+      "id": "tag-backup",
+      "name": "backup"
+    },
+    {
+      "id": "tag-billing",
+      "name": "billing"
+    },
+    {
+      "id": "tag-maintenance",
+      "name": "maintenance"
+    }
+  ],
+  "task_tags": [
+    {
+      "task_id": "t-ng-rack",
+      "tag_id": "tag-documentation"
+    },
+    {
+      "task_id": "t-ng-switch",
+      "tag_id": "tag-procurement"
+    },
+    {
+      "task_id": "t-ng-schedule",
+      "tag_id": "tag-phone-call"
+    },
+    {
+      "task_id": "t-ng-cutover",
+      "tag_id": "tag-after-hours"
+    },
+    {
+      "task_id": "t-ng-diagram",
+      "tag_id": "tag-documentation"
+    },
+    {
+      "task_id": "t-lk-theme",
+      "tag_id": "tag-dev"
+    },
+    {
+      "task_id": "t-lk-headshots",
+      "tag_id": "tag-waiting-on"
+    },
+    {
+      "task_id": "t-lk-redirects",
+      "tag_id": "tag-seo"
+    },
+    {
+      "task_id": "t-sm-audit",
+      "tag_id": "tag-backup"
+    },
+    {
+      "task_id": "t-sm-quote",
+      "tag_id": "tag-procurement"
+    },
+    {
+      "task_id": "t-sm-restore",
+      "tag_id": "tag-backup"
+    },
+    {
+      "task_id": "t-ops-licences",
+      "tag_id": "tag-billing"
+    },
+    {
+      "task_id": "t-ops-invoices",
+      "tag_id": "tag-billing"
+    },
+    {
+      "task_id": "t-ops-patch",
+      "tag_id": "tag-maintenance"
+    },
+    {
+      "task_id": "t-ops-ssl",
+      "tag_id": "tag-maintenance"
+    },
+    {
+      "task_id": "t-ops-onboard",
+      "tag_id": "tag-documentation"
+    }
+  ],
+  "attachments": [],
+  "research": [
+    {
+      "id": "r-cond-access",
+      "name": "Microsoft 365 Conditional Access",
+      "domain_id": "d-northgate",
+      "status": "learning",
+      "level": 2,
+      "tags": [
+        "m365",
+        "security"
+      ],
+      "body": "## Why\nEvery client on M365 Business Premium can enforce MFA and device compliance without buying anything else.\n\n## Notes\n- **Named locations** first, then a break-glass account excluded from every policy\n- Report-only mode for two weeks before enforcing\n- `Sign-in logs` → Conditional Access tab tells you which policy fired\n- Break-glass account: long password in the client's password manager, MFA on a phone the owner holds",
+      "links": [
+        {
+          "id": "l-ca-1",
+          "label": "Microsoft Learn — Conditional Access",
+          "url": "https://learn.microsoft.com/en-us/entra/identity/conditional-access/"
+        }
+      ],
+      "log": [
+        {
+          "id": "log-ca-1",
+          "body": "Walked through named locations and a break-glass exclusion on the test tenant.",
+          "created_at": "2026-11-06T15:10:00.000Z"
+        }
+      ],
+      "created_at": "2026-10-23T14:05:00.000Z",
+      "updated_at": "2026-11-06T14:05:00.000Z"
+    },
+    {
+      "id": "r-vlan",
+      "name": "VLAN design for small offices",
+      "domain_id": "d-northgate",
+      "status": "using",
+      "level": 3,
+      "tags": [
+        "networking"
+      ],
+      "body": "- One VLAN for staff, one for guest Wi-Fi, one for the phones and printers\n- Guest VLAN: client isolation on, no route to staff\n- Printers on the staff VLAN — mDNS does not cross VLANs without help\n- `show vlan brief` after every change, then ping the gateway from both sides",
+      "links": [
+        {
+          "id": "l-vlan-1",
+          "label": "UniFi — VLAN configuration",
+          "url": "https://help.ui.com/hc/en-us/articles/360016352213"
+        }
+      ],
+      "log": [],
+      "created_at": "2026-10-09T14:05:00.000Z",
+      "updated_at": "2026-11-02T14:05:00.000Z"
+    },
+    {
+      "id": "r-3-2-1",
+      "name": "3-2-1 backup rule",
+      "domain_id": "d-internal",
+      "status": "explore",
+      "level": 1,
+      "tags": [
+        "backup"
+      ],
+      "body": "Questions to settle before the Summit quote:\n- Is the offsite copy at the owner's second office \"offsite\" enough?\n- Restore test every quarter, or every month?\n- Who checks the job report when it goes red at 2am?",
+      "links": [],
+      "log": [],
+      "created_at": "2026-10-30T14:05:00.000Z",
+      "updated_at": "2026-10-30T14:05:00.000Z"
+    }
+  ]
+};
+/* DEMO_DATA:END */
+
+const DEMO_COUNTS = rows => rows.filter(r => r.demo).length;
+const demoCounts = () => ({
+  tasks: DEMO_COUNTS(S.tasks), projects: DEMO_COUNTS(S.projects), domains: DEMO_COUNTS(S.domains),
+  notes: DEMO_COUNTS(S.notes), topics: DEMO_COUNTS(S.research),
+});
+const demoTotal = c => c.tasks + c.projects + c.domains + c.notes + c.topics;
+const hasDemo = () => demoTotal(demoCounts()) > 0;
+
+/* Shift a demo payload's absolute dates onto today. Pure: returns a clone. */
+function shiftDemoPayload(data){
+  const d = clone(data);
+  const delta = d.demo_anchor ? dayNum(todayStr()) - dayNum(d.demo_anchor) : 0;
+  if (delta) {
+    const shift = v => typeof v === "string" && /^\d{4}-\d{2}-\d{2}/.test(v) ? addDays(v.slice(0, 10), delta) + v.slice(10) : v;
+    for (const t of d.tasks || []) t.due_date = shift(t.due_date);
+    for (const p of d.projects || []) p.due_date = shift(p.due_date);
+  }
+  delete d.demo; delete d.demo_anchor;
+  return d;
+}
+/* Mark exactly the rows the payload just wrote, so "Clear demo data" is surgical. */
+function markDemo(data){
+  const ids = {
+    tasks: new Set((data.tasks || []).map(x => x.id)), projects: new Set((data.projects || []).map(x => x.id)),
+    domains: new Set((data.domains || []).map(x => x.id)), notes: new Set((data.notes || []).map(x => x.id)),
+    research: new Set((data.research || []).map(x => x.id)),
+  };
+  const tag = (rows, set) => { for (const r of rows) if (set.has(r.id)) r.demo = true; };
+  tag(S.tasks, ids.tasks); tag(S.projects, ids.projects); tag(S.domains, ids.domains);
+  tag(S.notes, ids.notes); tag(S.research, ids.research);
+}
+/* replace=true is the first-run path: the demo *is* the workspace, so the five default
+   categories go too. replace=false merges it next to existing work (Settings button). */
+function loadDemo(replace){
+  const data = shiftDemoPayload(DEMO_DATA);
+  if (replace) { S = blankState(); S.domains = []; }
+  const st = importData(data);          // full schema validation, nothing applied on error
+  markDemo(data);
+  return st;
+}
+/* "Clear demo data" is one click and must never take real work with it: rows the user
+   created are kept, and anything that pointed at a demo client is re-homed to a real one. */
+function clearDemo(){
+  const demoTaskIds = new Set(S.tasks.filter(t => t.demo).map(t => t.id));
+  const demoProjectIds = new Set(S.projects.filter(p => p.demo).map(p => p.id));
+  S.tasks = S.tasks.filter(t => !t.demo);
+  S.projects = S.projects.filter(p => !p.demo);
+  S.research = S.research.filter(r => !r.demo);
+  S.notes = S.notes.filter(n => !n.demo && !(n.task_id && demoTaskIds.has(n.task_id)) && !(n.project_id && demoProjectIds.has(n.project_id)));
+  S.attachments = S.attachments.filter(a => !a.demo && !(a.task_id && demoTaskIds.has(a.task_id)));
+  S.domains = S.domains.filter(d => !d.demo);
+  if (!S.domains.length) S.domains = clone(DEFAULT_DOMAINS);
+  const keep = sortedDomains()[0].id;
+  for (const t of S.tasks) if (!domainById(t.domain_id)) t.domain_id = keep;
+  for (const p of S.projects) if (!domainById(p.domain_id)) p.domain_id = keep;
+  for (const r of S.research) if (r.domain_id && !domainById(r.domain_id)) r.domain_id = null;
+  for (const n of S.notes) if (n.project_id && !S.projects.some(p => p.id === n.project_id)) n.project_id = null;
+  S.notes = S.notes.filter(n => n.task_id || n.project_id);
+}
+/* The loader used by the buttons: guard rails, then loadDemo. Returns true when loaded. */
+function loadDemoUi(replace){
+  if (hasDemo()) { toast("The demo workspace is already loaded — Settings → Clear demo data removes it"); return false; }
+  if (!replace && hasUserData() && !confirm(`Add the demo workspace to your own data? It adds ${DEMO_DATA.domains.length} clients, ${DEMO_DATA.projects.length} projects and ${DEMO_DATA.tasks.length} tasks, every one labelled DEMO, and Settings → “Clear demo data” removes exactly them.`)) return false;
+  try { loadDemo(replace); return true; }
+  catch (e) { toast("Could not load the demo workspace: " + e.message, true); return false; }
+}
+function demoNoteHtml(){
+  const c = demoCounts();
+  return `<div class="demo-note"><span><b>DEMO</b> — sample data from a fictional IT services company
+    (${c.domains} clients · ${c.projects} projects · ${c.tasks} tasks). Nothing here is real; it is here so you can
+    see the app working before you trust it with your own work.</span>
+    <button class="btn sm" data-act="clearDemo">Clear demo data</button></div>`;
+}
+
+/* ------------------------------------------------------------------ licence (inert in beta)
+   The store is not live, so there is no key format, no signature and no network in this
+   build — and inventing a scheme here would only have to be replaced. What exists is the
+   seam: `Licence.verify(keyText, meta)` is the single function commerce fills in. It may be
+   sync or async and must resolve to one of
+       { valid:true, licensee:"Name", seats:1, expires:null }
+       { valid:false, reason:"expired" }
+   Everything else (the file picker, the status line, About, persistence) already works. */
+const LICENCE_KEY = "taskapp.licence";
+const Licence = {
+  verify: null,
+  state(){
+    let v = null;
+    try { v = JSON.parse(localStorage.getItem(LICENCE_KEY) || "null"); } catch (e) { v = null; }
+    if (!v || typeof v !== "object" || !v.valid) return { status:"unlicensed", valid:false, reason:(v && v.reason) || "beta" };
+    return v;
+  },
+  label(){
+    const s = this.state();
+    if (s.status === "active") return `Licensed to ${s.licensee || "this device"}${s.seats ? ` · ${s.seats} seat${s.seats === 1 ? "" : "s"}` : ""}`;
+    return "Unlicensed (beta)";
+  },
+  save(v){ try { localStorage.setItem(LICENCE_KEY, JSON.stringify(v)); } catch (e) { console.error("TaskApp: could not store the licence state", e); } },
+  async check(text){
+    if (typeof this.verify !== "function") return { valid:false, reason:"beta" };
+    try {
+      const r = await this.verify(text, { app:"taskapp", version:APP_VERSION });
+      return r && typeof r === "object" ? r : { valid:false, reason:"bad-response" };
+    } catch (e) { return { valid:false, reason:"error", detail:e.message }; }
+  }
+};
+
+/* ------------------------------------------------------------------ first run, help, licence panel */
+function welcomeHtml(){
+  return `<div class="welcome">
+    <div class="wmark" aria-hidden="true">✓</div>
+    <h2>Welcome to TaskApp</h2>
+    <p class="muted" style="margin-top:-2px">One file. No account, no cloud, no network. <b>Your data never leaves this device.</b></p>
+    <p class="muted small">Pick how to start — you can change your mind in Settings.</p>
+    <div class="wcards">
+      <button class="wcard" data-act="welcomeDemo"><b>Load the demo workspace</b><span>A fictional IT services company: ${DEMO_DATA.domains.length} clients, ${DEMO_DATA.projects.length} projects, ${DEMO_DATA.tasks.length} tasks with real due dates. One click clears it.</span></button>
+      <button class="wcard" data-act="welcomeImport"><b>Import a backup</b><span>Restore a <code>taskapp-backup-….json</code> file you exported from TaskApp.</span></button>
+      <button class="wcard" data-act="welcomeEmpty"><b>Start empty</b><span>A blank board with ${DEFAULT_DOMAINS.length} default categories, ready for your own work.</span></button>
+    </div>
+    <p class="muted small" style="margin-bottom:0">TaskApp ${esc(APP_VERSION)} · <button class="linkbtn" data-act="help">how it works</button></p>
+  </div>`;
+}
+function openWelcome(){ ui.welcome = true; openDrawer(welcomeHtml(), "Welcome to TaskApp"); }
+function finishWelcome(){ try { localStorage.setItem("taskapp.onboarded", nowUtc()); } catch (e) {} }
+
+const SHORTCUTS = [
+  ["n", "New task (a new research topic in the Research view)"],
+  ["/", "Jump to search"],
+  ["q", "Jump to the quick-add bar"],
+  ["t", "Cycle Dark → Light → Midnight"],
+  ["?", "This help"],
+  ["Esc", "Close a panel, or leave a field"],
+  ["Ctrl / ⌘ + Enter", "Save the open panel"],
+  ["Tab, Shift+Tab", "Move through controls — stays inside an open panel"],
+  ["Enter or Space", "Open the focused card, row, project or topic"],
+  ["Ctrl + ← / →", "Move the focused board card between columns"],
+  ["Ctrl + ↑ / ↓", "Reorder the focused board card in its column"],
+  ["← / →", "Move between the view tabs"],
+  ["Ctrl / ⌘ + P", "Print the current view (a clean light sheet)"],
+];
+function helpHtml(){
+  return `<div class="dh"><h2>How it works</h2><button class="x" data-act="close" aria-label="Close panel">×</button></div>
+  <div class="db help">
+    <p style="margin-top:0">Everything is one HTML file. There is nothing to install, no account to create, and it never contacts a server — open it and it works, online or off.</p>
+
+    <h4>Four things, nested</h4>
+    <p><b>Domains</b> are your clients or areas of work (a client name, “Internal”, a department). <b>Projects</b> are workstreams inside a domain. <b>Tasks</b> are the actual work and live in a project or straight under a domain. <b>Research</b> is an optional notebook for things you are learning — it can hold links and a study log.</p>
+
+    <h4>The daily loop</h4>
+    <p><b>Focus</b> shows the three tasks that matter right now, with Start / Done / Blocked buttons. <b>Board</b> is drag-and-drop across To Do → In Progress → Blocked → Completed. <b>List</b> is for bulk edits: change a status from the dropdown, search everything. <b>Home</b> is the morning view: overdue, due today, in progress and what is coming.</p>
+    <p>Type straight into the quick-add bar: <code>Call Dana about cutover !high #northgate @network due:tue</code> means priority high, client Northgate, project “network…”, due Tuesday. <code>every:week</code> repeats it.</p>
+
+    <h4>Where your data lives</h4>
+    <p>In this browser, on this device, and nowhere else. We cannot see it and cannot recover it. <b>Settings → Export backup</b> writes one JSON file — put it in your Google Drive or OneDrive folder, and do it weekly. <b>Import</b> merges a backup back in: same ids are updated, new ones added, nothing is deleted. Before any import the app downloads a safety copy of what you already had.</p>
+
+    <h4>Printing</h4>
+    <p>The <b>Print</b> button (or Ctrl/⌘ + P) prints the view you are looking at as a clean, light sheet — headers, filters and buttons are dropped. The board prints two columns to a page; the list and focus views print one item per row.</p>
+
+    <h4>Keyboard</h4>
+    <table class="kbd-table"><tbody>
+      ${SHORTCUTS.map(([k, d]) => `<tr><td>${k.split(" + ").map(p => `<kbd>${esc(p)}</kbd>`).join(" + ")}</td><td>${esc(d)}</td></tr>`).join("")}
+    </tbody></table>
+
+    <h4>Support and licence</h4>
+    <p>Licensed, not sold: one licence per named user per computer. The full EULA came with your purchase, and support details are on the receipt. The app shows its version and licence status in <b>Settings → About</b>.</p>
+    <p class="muted small">TaskApp ${esc(APP_VERSION)} · single-file edition · export format ${EXPORT_FORMAT_VERSION}</p>
+  </div>`;
+}
+function openHelp(){ openDrawer(helpHtml(), "How it works"); }
+
+function licenceHtml(){
+  const s = Licence.state();
+  const active = s.status === "active";
+  const status = active
+    ? `<span class="badge ok">Licensed</span><span class="small">${esc(s.licensee || "")}${s.seats ? ` · ${s.seats} seat${s.seats === 1 ? "" : "s"}` : ""}</span>`
+    : `<span class="badge">Unlicensed (beta)</span>`;
+  return `<div class="dh"><h2>Licence</h2><button class="x" data-act="close" aria-label="Close panel">×</button></div>
+  <div class="db lic">
+    <p class="lic-status" style="margin-top:0">${status}</p>
+    <p class="small"><b>TaskApp ${esc(APP_VERSION)}</b> — single-file edition.</p>
+    ${active
+      ? `<p class="muted small">This key was accepted by this build. Nothing is checked online; the key file stays on your machine.</p>`
+      : `<p class="muted small">This beta build does not check licences: every feature is unlocked, and a key file is stored but not verified. When the store goes live, the same button will report the licensee and seat count. Nothing is sent anywhere in either case.</p>`}
+    <p class="small" style="margin-top:16px"><b>Load a licence key…</b><br><span class="muted">A JSON or text file, as delivered with your purchase.</span></p>
+    <button class="btn" data-act="licencePick">Choose key file…</button>
+    <p class="muted small" style="margin-top:18px">Licensed, not sold. One licence covers one named user on one computer; moving to a replacement computer is fine. The full terms are the EULA supplied with your purchase — this screen is not the agreement.</p>
+  </div>`;
+}
+function openLicence(){ openDrawer(licenceHtml(), "Licence"); }
+
 /* ------------------------------------------------------------------ quick add parser */
 function parseQuick(text){
   const out = {tags:[]}; const words = [];
@@ -1247,6 +2282,14 @@ function parseDue(v){
 /* ------------------------------------------------------------------ rendering */
 const VIEW_LABELS = {home:"Home", focus:"Focus", board:"Board", list:"List", projects:"Projects", research:"Research", settings:"Settings"};
 let statsAll = null;
+function printHeadHtml(){
+  const bits = [VIEW_LABELS[ui.view] || ui.view];
+  if (ui.domain && domainById(ui.domain)) bits.push(domainById(ui.domain).name);
+  if (ui.project === "__none") bits.push("No project");
+  else if (ui.project && projectById(ui.project)) bits.push(projectById(ui.project).name);
+  return `<div id="printHead"><h1>${bits.map(esc).join(" · ")}</h1>
+    <div class="meta">${esc(LONG_DATE())} · TaskApp ${esc(APP_VERSION)}${hasDemo() ? " · DEMO DATA" : ""}</div></div>`;
+}
 function render(){
   statsAll = null;
   $$("#tabs button").forEach(b => {
@@ -1260,6 +2303,12 @@ function render(){
   renderFilters();
   const main = $("#main");
   ({home:renderHome, focus:renderFocus, board:renderBoard, list:renderList, projects:renderProjects, research:renderResearch, settings:renderSettings})[ui.view](main);
+  /* Product-surface chrome lives outside the one-slot system banner: a demo label must
+     never replace a quota error, and the print heading must exist in every view. */
+  const old = $("#printHead"); if (old) old.remove();
+  if (ui.view !== "settings") main.insertAdjacentHTML("afterbegin", printHeadHtml());
+  if (hasDemo()) main.insertAdjacentHTML("afterbegin", demoNoteHtml());
+  $("#demoPill").classList.toggle("hidden", !hasDemo());
 }
 function renderFilters(){
   const f = $("#filters");
@@ -1466,11 +2515,11 @@ function renderBoard(main){
     return `<section class="col" data-status="${s}" role="region" aria-label="${esc(label)} — ${col.length} task${col.length === 1 ? "" : "s"}"><h3>${label}<span class="n">${col.length}</span></h3>
       <div class="list">${shown.map(t => cardHtml(t, ctx)).join("")}${hidden ? `<button class="btn sm" data-morecol="${s}">Show ${Math.min(BOARD_PAGE, hidden)} more · ${hidden} hidden</button>` : ""}</div></section>`;
   }).join("")}</div>
-  <p class="muted small" style="margin-top:14px">Drag cards between columns (on a phone: press and hold, then drag). Click a card to edit. Keyboard: <kbd>Tab</kbd> to a card, <kbd>Enter</kbd> opens it, <kbd>Ctrl</kbd>+<kbd>←</kbd>/<kbd>→</kbd> moves it between columns, <kbd>Ctrl</kbd>+<kbd>↑</kbd>/<kbd>↓</kbd> reorders. <kbd>n</kbd> new task · <kbd>/</kbd> search · <kbd>t</kbd> theme · <kbd>Esc</kbd> close</p>`;
+  <p class="muted small noprint" style="margin-top:14px">Drag cards between columns (on a phone: press and hold, then drag). Click a card to edit. Keyboard: <kbd>Tab</kbd> to a card, <kbd>Enter</kbd> opens it, <kbd>Ctrl</kbd>+<kbd>←</kbd>/<kbd>→</kbd> moves it between columns, <kbd>Ctrl</kbd>+<kbd>↑</kbd>/<kbd>↓</kbd> reorders. <kbd>n</kbd> new task · <kbd>/</kbd> search · <kbd>t</kbd> theme · <kbd>Esc</kbd> close · <kbd>?</kbd> help</p>`;
 }
 function emptyHtml(){
-  return `<div class="empty"><h2>No tasks yet</h2><p>Add one with <b>+ Task</b> or the quick-add box, or start with example data.</p>
-    <p><button class="btn primary" data-act="sample">Load sample data</button> <button class="btn" data-act="import">Import a backup</button></p></div>`;
+  return `<div class="empty"><h2>No tasks yet</h2><p>Add one with <b>+ Task</b> or the quick-add box — or look around a working example first.</p>
+    <p><button class="btn primary" data-act="demo">Load the demo workspace</button> <button class="btn" data-act="import">Import a backup</button> <button class="btn" data-act="sample">Load sample data</button></p></div>`;
 }
 function renderList(main){
   const all = visibleTasks().filter(t => t.status !== "completed" || ui.q).sort(byImportance);
@@ -1481,12 +2530,12 @@ function renderList(main){
       <td><b>${esc(t.title)}</b> ${t.recurrence!=="none"?"🔁":""}</td>
       <td class="hide-sm"><span class="dot" style="--c:${esc(d?.color)}"></span> ${esc(d?.name)}</td>
       <td class="hide-sm">${esc(p?.name || "—")}</td>
-      <td><select data-status-for="${esc(t.id)}">${STATUSES.map(([s,l]) => `<option value="${s}" ${s===t.status?"selected":""}>${l}</option>`).join("")}</select></td>
+      <td><select class="noprint" data-status-for="${esc(t.id)}">${STATUSES.map(([s,l]) => `<option value="${s}" ${s===t.status?"selected":""}>${l}</option>`).join("")}</select><span class="printonly">${esc(STATUS_LABEL[t.status] || t.status)}</span></td>
       <td class="hide-sm"><span class="badge ${t.priority}">${t.priority}</span></td>
       <td>${dueBadge(t) || '<span class="muted">—</span>'}</td></tr>`; }).join("")}
   </tbody></table>
   ${hidden ? `<p><button class="btn sm" data-morelist>Show ${Math.min(LIST_PAGE, hidden)} more · ${hidden} hidden</button></p>` : ""}
-  <p class="muted small">Open tasks, highest priority first, then soonest due. Completed tasks are hidden unless you search.</p>`;
+  <p class="muted small noprint">Open tasks, highest priority first, then soonest due. Completed tasks are hidden unless you search.</p>`;
 }
 function renderFocus(main){
   if (!S.tasks.length) { main.innerHTML = emptyHtml(); return; }
@@ -1629,6 +2678,12 @@ function renderSettings(main){
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn primary" data-act="export">Export backup (.json)</button>
       <button class="btn" data-act="import">Import / merge backup</button>
+      ${(() => {
+        const d = demoCounts();
+        return hasDemo()
+          ? `<button class="btn" data-act="clearDemo">Clear demo data (${d.tasks} tasks, ${d.projects} projects, ${d.domains} clients)</button>`
+          : `<button class="btn" data-act="demo">Load the demo workspace</button>`;
+      })()}
       ${(() => { const c = sampleCounts(); return c.tasks + c.projects + c.topics === 0
         ? `<button class="btn" data-act="sample">Add sample data</button>`
         : `<button class="btn" data-act="removeSample">Remove sample data (${c.tasks} tasks, ${c.projects} projects, ${c.topics} topics)</button>`; })()}
@@ -1641,14 +2696,29 @@ function renderSettings(main){
     <p class="small"><code>!high</code> <code>!med</code> <code>!low</code> priority · <code>#church</code> domain (other #words become tags) · <code>@Fall</code> project (start of the name) ·
     <code>due:today</code> <code>due:tomorrow</code> <code>due:fri</code> <code>due:+3</code> <code>due:11/15</code> <code>due:2026-11-15</code> · <code>every:week</code> repeat</p>
   </div>
+  <div class="section"><h3>Help</h3>
+    <p class="muted small">Everything a buyer needs ships inside this file — there are no external docs to hunt for.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn" data-act="help">How it works &amp; keyboard shortcuts</button>
+      <button class="btn" data-act="print">Print this view</button>
+    </div>
+  </div>
+  <div class="section"><h3>Licence</h3>
+    <p class="small" style="margin-top:0"><b>${esc(Licence.label())}</b>
+      <span class="muted">— ${Licence.state().status === "active"
+        ? "accepted by this build; nothing is checked online."
+        : "beta build: licence checking is not active, so every feature is unlocked."}</span></p>
+    <button class="btn" data-act="licence">Licence &amp; activation…</button>
+  </div>
   <div class="section"><h3>About</h3>
-    <p class="small" style="margin-top:0"><b>TaskApp ${APP_VERSION}</b> · single-file edition</p>
-    <p class="muted small">One HTML file. No install, no account, no network — this app makes no requests at all and collects nothing.
-      Your tasks never leave this browser.</p>
+    <p class="small" style="margin-top:0"><b>TaskApp ${esc(APP_VERSION)}</b> · single-file edition</p>
+    <p class="muted small"><b>Your data never leaves this device.</b> One HTML file, no install, no account, no
+      network — this app makes no requests at all, holds no telemetry and collects nothing. Your tasks stay in
+      this browser's storage and are never uploaded anywhere, by us or by anyone else.</p>
     <p class="muted small">Licensed, not sold — see the EULA supplied with your purchase. Support: ${SUPPORT_CONTACT
       ? `<a href="mailto:${esc(SUPPORT_CONTACT)}">${esc(SUPPORT_CONTACT)}</a>`
-      : "the address on your purchase receipt"}.</p>
-    <p class="muted small">Version ${APP_VERSION} · export format ${EXPORT_FORMAT_VERSION} · storage schema ${STORE_SCHEMA_VERSION}
+      : "the address on your purchase receipt (support contact is being finalised for the beta)"}.</p>
+    <p class="muted small">Version ${esc(APP_VERSION)} · licence status ${esc(Licence.label())} · export format ${EXPORT_FORMAT_VERSION} · storage schema ${STORE_SCHEMA_VERSION}
       (the storage key keeps the name <code>${STORE_KEY}</code> so existing data is never orphaned).</p>
   </div>`;
 }
@@ -1679,6 +2749,7 @@ function openDrawer(html, label){
 }
 function closeDrawer(){
   ui.domDelete = null;
+  ui.welcome = false;
   $("#drawer").classList.add("hidden"); $("#scrim").classList.add("hidden");
   ui.drawer = null; ui.drawerDirty = null;
   if (lastOpener && document.contains(lastOpener) && typeof lastOpener.focus === "function") { try { lastOpener.focus(); } catch (e) {} }
@@ -1687,7 +2758,12 @@ function closeDrawer(){
 // The three user-initiated close paths (×, scrim, Escape) go through this, so a typed but
 // unsaved edit is never thrown away without a question.
 function tryCloseDrawer(){
-  if (!ui.drawer) return closeDrawer();
+  if (!ui.drawer) {
+    /* Dismissing the first-run welcome with Escape counts as an answer ("not now"), so it
+       does not reappear on every open; the demo stays reachable in Settings. */
+    if (ui.welcome) finishWelcome();
+    return closeDrawer();
+  }
   if (drawerHasUnsavedChanges() && !confirm("Discard your unsaved changes in this panel?")) return;
   closeDrawer();
 }
@@ -1842,6 +2918,31 @@ function act(name, el){
         const c = sampleCounts();
         if (!confirm(`Remove sample data? ${c.tasks} tasks, ${c.projects} projects and ${c.topics} research topics will be deleted. Rows you created yourself are untouched.`)) break;
         removeSample(); commit("Sample data removed"); break; }
+      /* ---- demo workspace ---- */
+      case "demo":
+        if (loadDemoUi(false)) commit("Demo workspace loaded — labelled DEMO; clear it any time");
+        break;
+      case "clearDemo": {
+        const c = demoCounts();
+        if (!hasDemo()) { toast("No demo data is loaded"); break; }
+        if (!confirm(`Clear the demo workspace? ${c.tasks} tasks, ${c.projects} projects, ${c.domains} clients and ${c.topics} research topics will be deleted. Rows you created yourself are kept.`)) break;
+        beginUndo("the demo workspace");
+        clearDemo(); commitDelete("Demo data cleared — Undo");
+        break; }
+      /* ---- first run ---- */
+      case "welcomeDemo":
+        finishWelcome();
+        if (loadDemoUi(true)) { commit("Demo workspace loaded — clear it any time"); closeDrawer(); toast("This is demo data — Settings → Clear demo data removes it"); }
+        break;
+      case "welcomeImport":
+        finishWelcome(); closeDrawer(); $("#importFile").click(); break;
+      case "welcomeEmpty":
+        finishWelcome(); closeDrawer(); toast("Starting empty — press n for a new task, or Settings → Load the demo workspace"); break;
+      /* ---- help, print, licence ---- */
+      case "help": openHelp(); break;
+      case "print": window.print(); break;
+      case "licence": openLicence(); break;
+      case "licencePick": $("#licenceFile").click(); break;
       case "import": $("#importFile").click(); break;
       case "newProject": openProject(null); break;
       case "saveTask": {
@@ -1974,6 +3075,8 @@ $("#tabs").addEventListener("click", e => { const b = e.target.closest("button")
 $("#newTask").onclick = () => openTask(null);
 $("#themeBtn").onclick = cycleTheme;
 $("#newProject").onclick = () => openProject(null);
+$("#helpBtn").onclick = openHelp;
+$("#printBtn").onclick = () => window.print();
 $("#scrim").onclick = tryCloseDrawer;
 let searchTimer = null;
 $("#search").addEventListener("input", e => {
@@ -2109,19 +3212,50 @@ $("#importFile").addEventListener("change", e => {
     let data;
     try { data = JSON.parse(r.result); }
     catch (err) { toast("Import failed — that file is not valid JSON. Nothing was changed.", true); return reset(); }
+    /* The demo file carries absolute dates plus a demo_anchor; shift them onto today so an
+       old download still shows two overdue items rather than a wall of them. */
+    const isDemo = !!(data && data.demo === true && data.demo_anchor);
+    if (isDemo) data = shiftDemoPayload(data);
     // Snapshot first, validate + stage in importData, back the snapshot up, then persist.
     // importData() throws with nothing applied, so a bad file never reaches storage.
     const preImport = exportData();
     try {
       const st = importData(data);
+      if (isDemo) markDemo(data);
       const backedUp = preImportBackup(preImport);
       if (!save()) throw new Error("the import could not be written to storage, so it was rolled back");
       localStorage.setItem("taskapp.lastImport", nowUtc());
       render();
-      toast(`Imported: ${st.inserted} added, ${st.updated} updated, ${st.skipped} unchanged` + (backedUp ? " · pre-import backup downloaded" : " · backup could not be downloaded"));
+      toast(`Imported: ${st.inserted} added, ${st.updated} updated, ${st.skipped} unchanged` + (isDemo ? " · demo data labelled, clear it in Settings" : "") + (backedUp ? " · pre-import backup downloaded" : " · backup could not be downloaded"));
     } catch (err) { toast("Import failed: " + err.message, true); }
     reset();
   };
+  r.readAsText(file);
+});
+/* Licence key files. In this build `Licence.check` returns {valid:false, reason:"beta"}
+   without reading the key, so the flow is exercised end to end but nothing is claimed —
+   the commerce build only has to set Licence.verify. */
+$("#licenceFile").addEventListener("change", e => {
+  const file = e.target.files[0]; if (!file) return;
+  const reset = () => { e.target.value = ""; };
+  if (file.size > 1048576) { toast("That file is over 1 MB — a licence key is a small JSON or text file.", true); return reset(); }
+  const r = new FileReader();
+  r.onload = async () => {
+    const res = await Licence.check(String(r.result));
+    Licence.save({
+      status: res.valid ? "active" : "unlicensed", valid: !!res.valid,
+      reason: res.valid ? null : (res.reason || "beta"), licensee: res.licensee || null,
+      seats: Number.isInteger(res.seats) ? res.seats : null, expires: res.expires || null,
+      checked_at: nowUtc(), file: safeName(file.name),
+    });
+    if ($("#drawer").getAttribute("aria-label") === "Licence") openLicence();
+    if (ui.view === "settings") render();
+    toast(res.valid
+      ? `Licence accepted — ${Licence.label()}`
+      : "Key file stored. This beta build does not verify licences, so every feature stays unlocked.");
+    reset();
+  };
+  r.onerror = () => { toast("That key file could not be read", true); reset(); };
   r.readAsText(file);
 });
 document.addEventListener("keydown", e => {
@@ -2132,6 +3266,7 @@ document.addEventListener("keydown", e => {
   else if (e.key === "/") { e.preventDefault(); $("#search").focus(); }
   else if (e.key === "q") { e.preventDefault(); $("#quick").focus(); }
   else if (e.key === "t" && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); cycleTheme(); }
+  else if (e.key === "?") { e.preventDefault(); openHelp(); }
 });
 
 /* ------------------------------------------------------------------ keyboard operability
@@ -2287,9 +3422,14 @@ document.addEventListener("touchcancel", () => { if (drag && drag.touch) { if (d
 document.addEventListener("contextmenu", e => { if (e.target.closest(".board .card")) e.preventDefault(); });
 
 /* ------------------------------------------------------------------ start */
+$("#brandVer").textContent = "v" + APP_VERSION;
 updateThemeBtn();
 render();
 if (RECOVERY) showRecoveryBanner(); else backupNudge();
+/* First run: an empty board teaches nothing, so ask once — and never again. */
+let onboarded = false;
+try { onboarded = !!localStorage.getItem("taskapp.onboarded"); } catch (e) {}
+if (FIRST_RUN && !RECOVERY && !onboarded) openWelcome();
 // refresh due-date labels when the day changes or the tab comes back
 let lastDay = todayStr();
 setInterval(() => { if (todayStr() !== lastDay) { lastDay = todayStr(); render(); } }, 60000);
