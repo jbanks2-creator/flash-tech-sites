@@ -2,6 +2,54 @@
 
 All notable changes to TaskApp. Versioning is semver for the single-file product.
 
+## [1.0.0-rc.4] — 2026-11-11
+
+The store build. Two surfaces the shop needs — an honest licence line and a website demo that
+cannot touch a visitor's own copy — plus the `dist/` drop the checkout delivers. **`taskapp.v1`,
+the storage schema and export format v1 are unchanged**, so every earlier backup restores here.
+
+### Added
+
+- **A licence screen that names the buyer.** The inert seam from rc.1 now does something:
+  `Licence.verify` reads the key from the purchase receipt and the name it was bought under,
+  and the panel, Settings and About report **"Licensed to <name>"**. It is checked on this
+  computer only — no account, no request, no licence server, and no homegrown signature
+  scheme (the provider's key is opaque; verifying it offline would need either their API or
+  keys we mint, and both were rejected). See the block comment above `parseLicence` and
+  `businesses/flash-apps/docs/store/LAUNCH.md` → "Licence decision". Accepted input is JSON
+  (`{"key":…,"licensee":…}`) or plain text (`key:` / `name:` lines). A key without a name is
+  refused with a plain-English reason rather than stored as if it worked.
+- **Website demo mode, `?demo=1`.** Loads the shipped demo workspace straight away and keeps
+  **every write in memory**: `save()` does not touch `localStorage`, onboarding is not marked,
+  and a licence entered in the demo is not stored. Reload and the demo is back to the sample
+  data. It only applies when the app holds no user data, so opening a real copy with `?demo=1`
+  cannot replace real work. This is what the store page embeds, from its own origin.
+
+### Changed
+
+- Licence status reads **"Unlicensed"** rather than "Unlicensed (beta)" — the beta wording
+  would be a lie on a paid copy.
+- The licence panel asks for the name and the key in the app, alongside the existing key-file
+  picker, and says plainly that nothing is sent anywhere.
+
+### Packaging
+
+- `dist/TaskApp-1.0.0-rc.4.html` is the release drop (rc.3 stays in `dist/archive/` as rc.3).
+- `scripts/build-demo.sh` installs the release artifact as `demo/site.html` for the demo
+  container and proves the copy matches the delivered checksum.
+
+### Verified
+
+- New `tools/audit/storefront-demo-probe.mjs` (8 assertions): demo workspace loads with no
+  welcome panel, **zero storage keys written**, an edit survives in memory but not a reload,
+  and `?demo=1` leaves a copy that already holds user data untouched.
+- `productisation-probe` licence section rewritten for the new behaviour: key-without-name is
+  refused (`no-name`), key + name activates, the panel shows "Licensed to Jane Doe", and no
+  request is made.
+- Whole audit suite re-run against the served rc.4 artifact: productisation 41/41, product
+  surface, a11y, undo, import backup, silent write, corrupt store, restore domains 34/34,
+  XSS (link + import), CSP, m2–m6 and `file://` all pass.
+
 ## [1.0.0-rc.3] — 2026-11-09
 
 Polish on top of the shipped build: the five minors that two rounds of independent

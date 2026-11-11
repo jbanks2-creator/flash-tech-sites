@@ -6,7 +6,7 @@
  *                  keeps two overdue items, and clears in one click without touching user rows
  *   4 print      — @media print forces a light sheet and drops the chrome
  *   5 help       — how-it-works + keyboard table ship inside the file
- *   6 licence    — key file is accepted but the beta reports "unlicensed (beta)"
+ *   6 licence    — a key with no name is refused; key + name activates locally and shows the licensee
  *   7 offline    — no request other than the document
  *
  * Run: node tools/audit/productisation-probe.mjs http://127.0.0.1:3601/ [demo-data.json]
@@ -102,7 +102,7 @@ const about = await page.evaluate(() => {
   return {
     version: APP_VERSION,
     versionInAbout: text.includes(APP_VERSION),
-    licenceStatus: /Unlicensed \(beta\)/.test(text),
+    licenceStatus: /Unlicensed/.test(text),
     dataStatement: /never leaves this device/i.test(text),
     licencePanel: !!document.querySelector('[data-act="licence"]'),
     helpButton: !!document.querySelector('[data-act="help"]'),
@@ -132,7 +132,8 @@ const help = await page.evaluate(() => {
 out.help = help;
 await page.keyboard.press("Escape");
 
-/* licence: a key file is read, stored, and honestly reported as unlicensed */
+/* licence: the provider's key is a purchase reference. A key file with no name is refused;
+   key + name activates locally, shows "Licensed to <name>", and sends nothing. */
 await page.click("#helpBtn"); // also prove the button opens the same panel
 await page.waitForTimeout(80);
 await page.keyboard.press("Escape");
@@ -142,19 +143,35 @@ await page.click('[data-act="licence"]');
 await page.waitForTimeout(100);
 await page.setInputFiles("#licenceFile", { name: "taskapp-key.json", mimeType: "application/json", buffer: Buffer.from('{"key":"DEMO-0000-0000"}') });
 await page.waitForTimeout(350);
-const licence = await page.evaluate(() => {
+const licenceNoName = await page.evaluate(() => {
   const stored = JSON.parse(localStorage.getItem("taskapp.licence") || "null");
   const d = document.querySelector("#drawer");
   return {
     stored, storedValid: stored?.valid, storedReason: stored?.reason,
-    panelStatus: /Unlicensed \(beta\)/.test(d.textContent),
-    label: Licence.label(),
+    panelUnlicensed: /Unlicensed/.test(d.textContent),
+    toastRefused: [...document.querySelectorAll(".toast")].some((t) => /Licence not accepted/.test(t.textContent)),
+    asksForName: !!d.querySelector("#licName") && !!d.querySelector("#licKey"),
     asksForFile: !!d.querySelector('[data-act="licencePick"]'),
-    verifyIsNull: Licence.verify === null,
-    toastSaysUnverified: [...document.querySelectorAll(".toast")].some((t) => /does not verify licences/.test(t.textContent)),
+  };
+});
+await page.fill("#licName", "Jane Doe");
+await page.fill("#licKey", "LS-TEST-0000-1111");
+await page.click('[data-act="licenceActivate"]');
+await page.waitForTimeout(300);
+const licence = await page.evaluate(() => {
+  const stored = JSON.parse(localStorage.getItem("taskapp.licence") || "null");
+  const d = document.querySelector("#drawer");
+  return {
+    stored, storedValid: stored?.valid, storedLicensee: stored?.licensee,
+    panelShowsName: /Licensed to Jane Doe/.test(d.textContent) || /Jane Doe/.test(d.textContent),
+    panelUnlicensed: /Unlicensed/.test(d.textContent),
+    label: Licence.label(),
+    toastAccepted: [...document.querySelectorAll(".toast")].some((t) => /Licence accepted/.test(t.textContent)),
+    verifyIsFunction: typeof Licence.verify === "function",
   };
 });
 out.licence = licence;
+out.licenceNoName = licenceNoName;
 await page.keyboard.press("Escape");
 
 /* adding my own row, then clearing the demo, must keep it (and re-home its domain) */
@@ -309,10 +326,13 @@ Object.assign(checks, {
   help_shows_version: help.mentionsVersion,
 
   // 6 licence
-  licence_accepts_key_file: !!licence.stored && licence.stored.file === "taskapp-key.json",
-  licence_is_inert_in_beta: licence.storedValid === false && licence.storedReason === "beta" && licence.verifyIsNull,
-  licence_reports_unlicensed: licence.panelStatus && licence.label === "Unlicensed (beta)" && licence.toastSaysUnverified,
-  licence_seam_documented: licence.asksForFile,
+  licence_refuses_key_without_name: !!licenceNoName.stored && licenceNoName.stored.file === "taskapp-key.json"
+    && licenceNoName.storedValid === false && licenceNoName.storedReason === "no-name"
+    && licenceNoName.panelUnlicensed && licenceNoName.toastRefused,
+  licence_activates_with_key_and_name: licence.storedValid === true && licence.storedLicensee === "Jane Doe",
+  licence_shows_licensee: licence.label === "Licensed to Jane Doe" && licence.panelShowsName
+    && !licence.panelUnlicensed && licence.toastAccepted,
+  licence_checks_locally: licence.verifyIsFunction && licenceNoName.asksForName && licenceNoName.asksForFile,
 
   // 7 import path + offline
   welcome_import_loads_real_file: imported.tasks === imported.expected && imported.demoMarked === imported.expected,

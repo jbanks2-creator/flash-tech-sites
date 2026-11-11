@@ -48,7 +48,7 @@ three files that get zipped and sold, and nothing else.
 | `TaskApp-<version>.html.sha256` | `sha256sum -c` format |
 | `README.txt` | the first file to read: how to open it, where data lives, backup, support, licence |
 
-The storefront ships **1.0.0-rc.3**, which is what sits at the top of `dist/`. Older
+The storefront ships **1.0.0-rc.4**, which is what sits at the top of `dist/`. Older
 releases are kept under `dist/archive/<version>/` with *their own* `README.txt` and
 `.sha256` — `bash scripts/build-archive.sh <version> <git-rev>` rebuilds one from history
 (`1.0.0-rc.2` from `7b7bfef`). That separation is the point: an old html beside a new
@@ -155,12 +155,12 @@ Everything else (file picker, status in Settings → About, persistence under
 
 ## Versioning
 
-`APP_VERSION` is what a buyer sees: shown in the header (`v1.0.0-rc.3`), in Settings →
+`APP_VERSION` is what a buyer sees: shown in the header (`v1.0.0-rc.4`), in Settings →
 About, and written into every export. It must equal `VERSION` — the build fails otherwise.
 
 | Here | Jay's label |
 |---|---|
-| `1.0.0-rc.3` (`VERSION`) | "TaskApp V4" + hardening + productisation + backup-restore fix (QA B1/B2/m1) + QA minors m2–m6 |
+| `1.0.0-rc.4` (`VERSION`) | "TaskApp V4" + hardening + productisation + backup-restore fix (QA B1/B2/m1) + QA minors m2–m6 + licence line and website demo mode |
 
 `V4` was Jay's own iteration label on the original upload; this repo starts a proper
 semver line at `1.0.0-beta.1` and the first commit kept the V4 file byte-identical
@@ -170,7 +170,7 @@ Three numbers are deliberately separate:
 
 | Number | Meaning | Current |
 |---|---|---|
-| `APP_VERSION` | what a buyer has | `1.0.0-rc.3` |
+| `APP_VERSION` | what a buyer has | `1.0.0-rc.4` |
 | export `version` | shape of the JSON file | `1` |
 | `STORE_KEY` / `version` | shape of the stored blob | `taskapp.v1` / `1` |
 
@@ -259,10 +259,11 @@ receipt.
 ```
 index.html                  the product (single file)
 demo-data.json              the demo workspace (taskapp-export v1); embedded into index.html
-VERSION                     1.0.0-rc.3
+VERSION                     1.0.0-rc.4
 LICENSE                     licence-not-sale statement, points at the EULA
 CHANGELOG.md                what changed, per version
 scripts/build.sh            dist artifact + checksum + README.txt (deterministic)
+scripts/build-demo.sh       installs the release artifact as demo/site.html for the website demo
 scripts/build-archive.sh    an old release into dist/archive/<version>/ with its own README
 scripts/check-dist.sh       asserts every html in dist/ has its own README + verifying .sha256
 scripts/embed-demo.mjs      keeps embedded DEMO_DATA identical to demo-data.json

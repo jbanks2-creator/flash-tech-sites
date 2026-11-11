@@ -16,6 +16,22 @@ services:
     networks:
       - taskapp_net
 
+  # Website demo: the same single file, served from its own origin on purpose. The store
+  # page embeds it with ?demo=1 so a visitor cannot write storage that a later real install
+  # would read. Built by scripts/build-demo.sh from dist/, never edited by hand.
+  demo:
+    image: nginx:1.27-alpine
+    container_name: taskapp-demo
+    mem_limit: 64m
+    restart: unless-stopped
+    volumes:
+      - ./demo/site.html:/usr/share/nginx/html/site.html:ro
+      - ./demo/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "127.0.0.1:3602:80"
+    networks:
+      - taskapp_net
+
 networks:
   taskapp_net:
     name: taskapp_net

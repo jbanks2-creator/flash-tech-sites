@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-C1ragFL4qO1xRsx2YWNY3bWj3bFTjO9OAvmQjQ+/1KA=' 'sha256-3lmT+j2MOssBeOYPKBeNdIDue5AoGo0QpVmgIza+PVI='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'none'; base-uri 'none'; object-src 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-C1ragFL4qO1xRsx2YWNY3bWj3bFTjO9OAvmQjQ+/1KA=' 'sha256-X8po9fs8pfFmJrhOY3fjNBgwILUlKXUSB6+YMH12su8='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'none'; base-uri 'none'; object-src 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>TaskApp — tasks, projects and clients</title>
 <meta name="description" content="A task, project and client manager in one HTML file. No account, no cloud, no network: your data never leaves this device.">
@@ -368,6 +368,10 @@ details.grp .rows{margin-top:6px}
 kbd{background:var(--card2);border:1px solid var(--border);border-bottom-width:2px;border-radius:4px;
   padding:1px 5px;font:inherit;font-size:11.5px}
 .lic-status{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.lic-form{display:grid;gap:8px;margin-top:10px}
+.lic-form label{font-size:12px;font-weight:600;color:var(--muted)}
+.lic-form input{width:100%;min-height:40px;padding:9px 10px;border:1px solid var(--border);border-radius:8px;background:var(--panel);color:var(--text);font:inherit;font-size:13px}
+.lic-form .row2{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .badge.ok{background:var(--ok-bg,var(--card2));color:var(--ok-fg);border:1px solid var(--ok-bd)}
 
 /* =====================================================================
@@ -476,9 +480,14 @@ const STORE_KEY = "taskapp.v1";
    is the shape of the JSON file (bump only when the format changes); STORE_SCHEMA_VERSION
    is the shape of the localStorage blob (bump only with a migration in migrateState).
    "taskapp.v1" keeps its name because renaming the key would orphan existing buyers. */
-const APP_VERSION = "1.0.0-rc.3";
+const APP_VERSION = "1.0.0-rc.4";
 const EXPORT_FORMAT_VERSION = 1;
 const STORE_SCHEMA_VERSION = 1;
+/* Website demo mode (`?demo=1`), used by the store page's embedded iframe. It loads the
+   demo workspace and keeps every write in memory: no visitor state is stored, so the next
+   load always starts from the shipped demo. It only takes effect when there is no user
+   data, so opening a real copy with ?demo=1 cannot replace real work. */
+const DEMO_MODE = (() => { try { return new URLSearchParams(location.search).get("demo") === "1"; } catch (e) { return false; } })();
 /* Filled in by ops when the support address is decided. Until then the honest answer is
    "the address on your purchase receipt" — inventing one would put a dead mailbox in a
    paid product. */
@@ -670,6 +679,12 @@ function save(){
   let json;
   try { json = JSON.stringify(S); }
   catch (e) { toast("Could not serialise your data: " + e.message, true); return false; }
+  if (DEMO_MODE) {                                   // website demo: in-memory only, nothing saved
+    SAVED_JSON = json;
+    if (undoEntry && !undoEntry.post) undoEntry.post = json;
+    clearBanner("save");
+    return true;
+  }
   try {
     localStorage.setItem(STORE_KEY, json);
     SAVED_JSON = json;
@@ -2248,34 +2263,86 @@ function demoNoteHtml(){
     <button class="btn sm" data-act="clearDemo">Clear demo data</button></div>`;
 }
 
-/* ------------------------------------------------------------------ licence (inert in beta)
-   The store is not live, so there is no key format, no signature and no network in this
-   build — and inventing a scheme here would only have to be replaced. What exists is the
-   seam: `Licence.verify(keyText, meta)` is the single function commerce fills in. It may be
-   sync or async and must resolve to one of
-       { valid:true, licensee:"Name", seats:1, expires:null }
-       { valid:false, reason:"expired" }
-   Everything else (the file picker, the status line, About, persistence) already works. */
+/* ------------------------------------------------------------------ licence
+   Commerce decision (card t_a8751e2f): the checkout — Lemon Squeezy, merchant of record —
+   issues an opaque key with every order. There is no licence server, no phone-home and no
+   request of any kind from this app, so the key cannot be checked cryptographically on the
+   device: verifying it would mean either calling the provider's API (a network request) or
+   minting our own signed keys (a licence authority to run). Both were rejected. The key is
+   therefore a *purchase reference*: the buyer supplies it with the name on the receipt, the
+   app stores both on this computer and reports "Licensed to <name>". A refund is enforced
+   at the provider by deactivating the key; offline, this app keeps working. See
+   docs/store/LAUNCH.md ("Licence decision").
+
+   Accepted key files (text, at most 1 MB):
+     {"key":"XXXX-XXXX-XXXX","licensee":"Jane Doe","seats":1,"expires":null,"product":"taskapp"}
+   or the same fields one per line (`key:`, `name:`/`licensee:`, `seats:`, `expires:`). */
 const LICENCE_KEY = "taskapp.licence";
+const LICENCE_KEY_RE = /^[A-Za-z0-9][A-Za-z0-9-]{7,127}$/;
+const LICENCE_NAME_MAX = 80;
+function parseLicence(text){
+  const raw = String(text == null ? "" : text).trim();
+  if (!raw) return { valid:false, reason:"empty" };
+  let f = null;
+  if (raw[0] === "{") {
+    try { f = JSON.parse(raw); } catch (e) { return { valid:false, reason:"bad-json" }; }
+    if (!isObj(f)) return { valid:false, reason:"bad-json" };
+  } else {
+    f = {};
+    for (const line of raw.split(/\r?\n/)) {
+      const m = line.match(/^\s*([A-Za-z_]+)\s*[:=]\s*(.+?)\s*$/);
+      if (m) f[m[1].toLowerCase()] = m[2];
+      else if (line.trim() && !f.key) f.key = line.trim();
+    }
+  }
+  const key = String(f.key == null ? "" : f.key).trim();
+  const name = String(f.licensee == null ? (f.name == null ? "" : f.name) : f.licensee).trim();
+  if (!key) return { valid:false, reason:"no-key" };
+  if (!LICENCE_KEY_RE.test(key)) return { valid:false, reason:"bad-key" };
+  if (!name) return { valid:false, reason:"no-name" };
+  if (name.length > LICENCE_NAME_MAX) return { valid:false, reason:"long-name" };
+  if (f.product && String(f.product).toLowerCase() !== "taskapp") return { valid:false, reason:"wrong-product" };
+  let expires = null;
+  if (f.expires) {
+    const t = Date.parse(String(f.expires));
+    if (!Number.isFinite(t)) return { valid:false, reason:"bad-expiry" };
+    if (t < Date.now()) return { valid:false, reason:"expired", expires:String(f.expires) };
+    expires = new Date(t).toISOString();
+  }
+  const seats = Number.isInteger(Number(f.seats)) && Number(f.seats) > 0 && Number(f.seats) < 1000 ? Number(f.seats) : null;
+  return { valid:true, licensee:name, seats, expires };
+}
+const LICENCE_REASONS = {
+  empty:"That file was empty.",
+  "bad-json":"That file is not valid JSON.",
+  "no-key":"There is no licence key in that file.",
+  "bad-key":"That does not look like a licence key — it should be at least 8 letters, digits or dashes.",
+  "no-name":"The key is there but the name is not. A licence is per named user, so add the name from your receipt (name: Your Name).",
+  "long-name":"That name is longer than 80 characters — use the name on the receipt.",
+  "wrong-product":"That key is for a different product.",
+  "bad-expiry":"The expiry date in that file could not be read.",
+  expired:"That licence has expired.",
+  error:"The licence key could not be read.",
+};
 const Licence = {
-  verify: null,
+  verify: parseLicence,
   state(){
     let v = null;
     try { v = JSON.parse(localStorage.getItem(LICENCE_KEY) || "null"); } catch (e) { v = null; }
-    if (!v || typeof v !== "object" || !v.valid) return { status:"unlicensed", valid:false, reason:(v && v.reason) || "beta" };
+    if (!v || typeof v !== "object" || !v.valid) return { status:"unlicensed", valid:false, reason:(v && v.reason) || "none" };
     return v;
   },
   label(){
     const s = this.state();
     if (s.status === "active") return `Licensed to ${s.licensee || "this device"}${s.seats ? ` · ${s.seats} seat${s.seats === 1 ? "" : "s"}` : ""}`;
-    return "Unlicensed (beta)";
+    return "Unlicensed";
   },
-  save(v){ try { localStorage.setItem(LICENCE_KEY, JSON.stringify(v)); } catch (e) { console.error("TaskApp: could not store the licence state", e); } },
+  save(v){ if (DEMO_MODE) return; try { localStorage.setItem(LICENCE_KEY, JSON.stringify(v)); } catch (e) { console.error("TaskApp: could not store the licence state", e); } },
   async check(text){
-    if (typeof this.verify !== "function") return { valid:false, reason:"beta" };
+    if (typeof this.verify !== "function") return { valid:false, reason:"error" };
     try {
       const r = await this.verify(text, { app:"taskapp", version:APP_VERSION });
-      return r && typeof r === "object" ? r : { valid:false, reason:"bad-response" };
+      return r && typeof r === "object" ? r : { valid:false, reason:"error" };
     } catch (e) { return { valid:false, reason:"error", detail:e.message }; }
   }
 };
@@ -2296,7 +2363,7 @@ function welcomeHtml(){
   </div>`;
 }
 function openWelcome(){ ui.welcome = true; openDrawer(welcomeHtml(), "Welcome to TaskApp"); }
-function finishWelcome(){ try { localStorage.setItem("taskapp.onboarded", nowUtc()); } catch (e) {} }
+function finishWelcome(){ if (DEMO_MODE) return; try { localStorage.setItem("taskapp.onboarded", nowUtc()); } catch (e) {} }
 
 const SHORTCUTS = [
   ["n", "New task (a new research topic in the Research view)"],
@@ -2350,20 +2417,43 @@ function licenceHtml(){
   const active = s.status === "active";
   const status = active
     ? `<span class="badge ok">Licensed</span><span class="small">${esc(s.licensee || "")}${s.seats ? ` · ${s.seats} seat${s.seats === 1 ? "" : "s"}` : ""}</span>`
-    : `<span class="badge">Unlicensed (beta)</span>`;
+    : `<span class="badge">Unlicensed</span>`;
   return `<div class="dh"><h2>Licence</h2><button class="x" data-act="close" aria-label="Close panel">×</button></div>
   <div class="db lic">
     <p class="lic-status" style="margin-top:0">${status}</p>
     <p class="small"><b>TaskApp ${esc(APP_VERSION)}</b> — single-file edition.</p>
     ${active
-      ? `<p class="muted small">This key was accepted by this build. Nothing is checked online; the key file stays on your machine.</p>`
-      : `<p class="muted small">This beta build does not check licences: every feature is unlocked, and a key file is stored but not verified. When the store goes live, the same button will report the licensee and seat count. Nothing is sent anywhere in either case.</p>`}
-    <p class="small" style="margin-top:16px"><b>Load a licence key…</b><br><span class="muted">A JSON or text file, as delivered with your purchase.</span></p>
-    <button class="btn" data-act="licencePick">Choose key file…</button>
+      ? `<p class="muted small">This key was accepted by this build. Nothing is checked online; the key and the name stay on this computer.</p>`
+      : `<p class="muted small">Every feature is unlocked whether or not a key is present. A key marks your copy as licensed to the named buyer; it is checked on this computer only, and nothing is sent anywhere.</p>`}
+    <p class="small" style="margin-top:16px"><b>Enter the key from your receipt</b></p>
+    <div class="lic-form">
+      <label for="licName">Name the licence is for</label>
+      <input id="licName" type="text" maxlength="80" autocomplete="name" placeholder="Jane Doe" value="${active ? esc(s.licensee || "") : ""}">
+      <label for="licKey">Licence key</label>
+      <input id="licKey" type="text" maxlength="128" autocomplete="off" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX">
+      <div class="row2"><button class="btn" data-act="licenceActivate">Activate</button>
+      <button class="btn" data-act="licencePick">Choose key file…</button></div>
+    </div>
+    <p class="muted small" style="margin-top:12px">The key is the one on your purchase receipt, and the checkout delivers it by email. A key file works too — JSON or plain text. <b>No account, no phone-home:</b> the app never contacts a licence server.</p>
     <p class="muted small" style="margin-top:18px">Licensed, not sold. One licence covers one named user on one computer; moving to a replacement computer is fine. The full terms are the EULA supplied with your purchase — this screen is not the agreement.</p>
   </div>`;
 }
 function openLicence(){ openDrawer(licenceHtml(), "Licence"); }
+/* One path for the form and for a key file, so both report the same thing. */
+async function applyLicence(text, fileName){
+  const res = await Licence.check(String(text == null ? "" : text));
+  Licence.save({
+    status: res.valid ? "active" : "unlicensed", valid: !!res.valid,
+    reason: res.valid ? null : (res.reason || "error"), licensee: res.valid ? res.licensee : null,
+    seats: res.valid && Number.isInteger(res.seats) ? res.seats : null, expires: (res.valid && res.expires) || null,
+    checked_at: nowUtc(), file: safeName(fileName || ""),
+  });
+  if ($("#drawer").getAttribute("aria-label") === "Licence") openLicence();
+  if (ui.view === "settings") render();
+  if (res.valid) toast(`Licence accepted — ${Licence.label()}`);
+  else toast(`Licence not accepted — ${LICENCE_REASONS[res.reason] || LICENCE_REASONS.error}`, true);
+  return res;
+}
 
 /* ------------------------------------------------------------------ quick add parser */
 function parseQuick(text){
@@ -2821,7 +2911,7 @@ function renderSettings(main){
     <p class="small" style="margin-top:0"><b>${esc(Licence.label())}</b>
       <span class="muted">— ${Licence.state().status === "active"
         ? "accepted by this build; nothing is checked online."
-        : "beta build: licence checking is not active, so every feature is unlocked."}</span></p>
+        : "no key loaded: every feature is unlocked. Enter the key from your purchase receipt to show who this copy is licensed to."}</span></p>
     <button class="btn" data-act="licence">Licence &amp; activation…</button>
   </div>
   <div class="section"><h3>About</h3>
@@ -2831,7 +2921,7 @@ function renderSettings(main){
       this browser's storage and are never uploaded anywhere, by us or by anyone else.</p>
     <p class="muted small">Licensed, not sold — see the EULA supplied with your purchase. Support: ${SUPPORT_CONTACT
       ? `<a href="mailto:${esc(SUPPORT_CONTACT)}">${esc(SUPPORT_CONTACT)}</a>`
-      : "the address on your purchase receipt (support contact is being finalised for the beta)"}.</p>
+      : "the address on your purchase receipt"}.</p>
     <p class="muted small">Version ${esc(APP_VERSION)} · licence status ${esc(Licence.label())} · export format ${EXPORT_FORMAT_VERSION} · storage schema ${STORE_SCHEMA_VERSION}
       (the storage key keeps the name <code>${STORE_KEY}</code> so existing data is never orphaned).</p>
   </div>`;
@@ -3110,6 +3200,13 @@ function act(name, el){
       case "print": window.print(); break;
       case "licence": openLicence(); break;
       case "licencePick": $("#licenceFile").click(); break;
+      case "licenceActivate": {
+        const k = ($("#licKey") && $("#licKey").value || "").trim();
+        const n = ($("#licName") && $("#licName").value || "").trim();
+        if (!k) { toast("Paste the licence key from your receipt first.", true); break; }
+        applyLicence(`${k}\nname: ${n}`, "");
+        break;
+      }
       case "import": $("#importFile").click(); break;
       case "newProject": openProject(null); break;
       case "saveTask": {
@@ -3410,29 +3507,14 @@ $("#importFile").addEventListener("change", e => {
   };
   r.readAsText(file);
 });
-/* Licence key files. In this build `Licence.check` returns {valid:false, reason:"beta"}
-   without reading the key, so the flow is exercised end to end but nothing is claimed —
-   the commerce build only has to set Licence.verify. */
+/* Licence key files. The key is a purchase reference, not a signature: `parseLicence`
+   reads it locally and nothing is sent anywhere (see the licence block above). */
 $("#licenceFile").addEventListener("change", e => {
   const file = e.target.files[0]; if (!file) return;
   const reset = () => { e.target.value = ""; };
   if (file.size > 1048576) { toast("That file is over 1 MB — a licence key is a small JSON or text file.", true); return reset(); }
   const r = new FileReader();
-  r.onload = async () => {
-    const res = await Licence.check(String(r.result));
-    Licence.save({
-      status: res.valid ? "active" : "unlicensed", valid: !!res.valid,
-      reason: res.valid ? null : (res.reason || "beta"), licensee: res.licensee || null,
-      seats: Number.isInteger(res.seats) ? res.seats : null, expires: res.expires || null,
-      checked_at: nowUtc(), file: safeName(file.name),
-    });
-    if ($("#drawer").getAttribute("aria-label") === "Licence") openLicence();
-    if (ui.view === "settings") render();
-    toast(res.valid
-      ? `Licence accepted — ${Licence.label()}`
-      : "Key file stored. This beta build does not verify licences, so every feature stays unlocked.");
-    reset();
-  };
+  r.onload = async () => { await applyLicence(String(r.result), file.name); reset(); };
   r.onerror = () => { toast("That key file could not be read", true); reset(); };
   r.readAsText(file);
 });
@@ -3607,7 +3689,8 @@ if (RECOVERY) showRecoveryBanner(); else backupNudge();
 /* First run: an empty board teaches nothing, so ask once — and never again. */
 let onboarded = false;
 try { onboarded = !!localStorage.getItem("taskapp.onboarded"); } catch (e) {}
-if (FIRST_RUN && !RECOVERY && !onboarded) openWelcome();
+if (DEMO_MODE && !RECOVERY && !hasUserData()) { loadDemo(true); finishWelcome(); render(); }
+else if (FIRST_RUN && !RECOVERY && !onboarded) openWelcome();
 // refresh due-date labels when the day changes or the tab comes back
 let lastDay = todayStr();
 setInterval(() => { if (todayStr() !== lastDay) { lastDay = todayStr(); render(); } }, 60000);
