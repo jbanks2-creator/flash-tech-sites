@@ -178,7 +178,7 @@ export default function TaskAppStorePage() {
           <div className={styles.crumb}>
             <Link href="/" className="logo" style={{ gap: 8 }}><span className="mark">F</span> {store.brand}</Link>
             <span className={styles.sep}>/</span>
-            <span>Apps</span>
+            <span className={styles.crumbApps}>Apps</span>
             <span className={styles.sep}>/</span>
             <span style={{ color: "var(--ink)", fontWeight: 650 }}>TaskApp</span>
           </div>

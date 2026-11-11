@@ -176,4 +176,15 @@
   .objection { padding: 24px; }
   .mobileStrip { grid-template-columns: 1fr; }
   .mobileStrip img { max-width: 320px; margin: 0 auto; }
+
+  /* The header was forcing a 462 px layout viewport at 390: the crumb and two buttons
+     could not shrink. Drop the crumb's "Apps /" and the duplicate demo link; the hero's
+     demo button is the same target on the same screen. */
+  .topbarInner { height: auto; min-height: 56px; padding: 8px 0; gap: 8px; }
+  .crumb { min-width: 0; overflow: hidden; white-space: nowrap; gap: 4px; font-size: .82rem; }
+  .crumb .logo { flex: none; }
+  .crumbApps, .sep { display: none; }
+  .topnav { flex: none; gap: 6px; }
+  .topnav a[href="#demo"] { display: none; }
+  .topnav .btn { padding: 9px 12px; font-size: .82rem; }
 }

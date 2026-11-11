@@ -1,18 +1,13 @@
 /**
- * Store-front verification against a running host.
- *
- *   STORE_HOST=http://127.0.0.1:3401 OUT=/tmp/store-shots node scripts/verify-store.mjs
- *
- * Needs playwright-core and a Chromium build (the taskapp repo's tools/audit has both on this
- * box: `NODE_PATH` does not work for ESM, so symlink it next to this script or run from a
- * directory whose node_modules holds playwright-core).
+ * Store-front verification against the running dev host (127.0.0.1:3401).
+ * Everything here is measured in a real browser, not inferred from source.
  */
 import { chromium } from "playwright-core";
 import { mkdirSync } from "node:fs";
 
-const EXEC = process.env.CHROME || "/home/Jerry/.cache/ms-playwright/chromium-1254/chrome-linux64/chrome";
+const EXEC = "/home/Jerry/.cache/ms-playwright/chromium-1254/chrome-linux64/chrome";
 const HOST = process.env.STORE_HOST || "http://127.0.0.1:3401";
-const OUT = process.env.OUT || "/tmp/store-evidence";
+const OUT = process.env.OUT || "/home/Jerry/.hermes/cache/scratch/store-evidence";
 mkdirSync(OUT, { recursive: true });
 
 const browser = await chromium.launch({
@@ -138,12 +133,14 @@ await mp.goto(`${HOST}/apps/taskapp`, { waitUntil: "networkidle" });
 await mp.waitForTimeout(1000);
 const m = await mp.evaluate(() => ({
   scrollWidth: document.documentElement.scrollWidth,
+  clientWidth: document.documentElement.clientWidth,
   innerWidth: window.innerWidth,
   iframeBox: (() => { const r = document.querySelector("iframe")?.getBoundingClientRect(); return r && { w: Math.round(r.width), h: Math.round(r.height) }; })(),
   buyVisible: !!document.querySelector('a[href="#pricing"]'),
   faqCount: document.querySelectorAll("details").length,
 }));
-check("mobile: no horizontal scroll", m.scrollWidth === m.innerWidth, m);
+check("mobile: layout viewport is the device width", m.clientWidth === 390 && m.innerWidth === 390, m);
+check("mobile: no horizontal scroll", m.scrollWidth === 390, m);
 check("mobile: demo iframe sized to screen", m.iframeBox && m.iframeBox.w > 300 && m.iframeBox.w <= 390, m.iframeBox);
 await mp.screenshot({ path: `${OUT}/store-mobile.png`, fullPage: true });
 await mp.locator("iframe").first().scrollIntoViewIfNeeded();
