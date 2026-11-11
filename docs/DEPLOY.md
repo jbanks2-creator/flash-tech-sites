@@ -50,3 +50,9 @@ To make it live (after MX/SPF/DKIM exist on flashtech.biz):
 - No analytics, no favicon, no OG image, no sitemap.
 - Brand palette is a placeholder (navy/electric blue) pending a real brand file.
 - `The Wiz` section is a teaser; character art does not exist.
+
+## TaskApp storefront
+
+`/apps/taskapp` is documented separately in [`STORE-DEPLOY.md`](STORE-DEPLOY.md): routes, the
+content sync and build gate, environment variables, the separate-origin demo container, and the
+**no analytics** rule that applies to that page.

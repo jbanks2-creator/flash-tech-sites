@@ -1,0 +1,166 @@
+{
+  "version": "1.0.0-rc.4",
+  "synced_from": {
+    "docs": "/home/Jerry/.hermes/hermes-org/businesses/flash-apps/docs/store",
+    "assets": "/home/Jerry/.hermes/hermes-org/businesses/flash-apps/assets/store",
+    "app": "/home/Jerry/apps/taskapp"
+  },
+  "files": [
+    {
+      "rel": "content/store/eula.md",
+      "source": "/home/Jerry/.hermes/hermes-org/businesses/flash-apps/docs/store/eula.md",
+      "label": "eula.md",
+      "source_sha256": "3bb6e11853683fc8672b74858ca6b4e3de57523a83c317c02ba6a48397012b59",
+      "copy_sha256": "7a147dfb8711c3c965915ce0ac5f40d992dfe92581eec2f0508fcd5ee68f06ff",
+      "bytes": 9415
+    },
+    {
+      "rel": "content/store/refund-policy.md",
+      "source": "/home/Jerry/.hermes/hermes-org/businesses/flash-apps/docs/store/refund-policy.md",
+      "label": "refund-policy.md",
+      "source_sha256": "ba5bdc0272aac1a7163bb7ef228ef3693118dcc59061fefd575057a2773e4703",
+      "copy_sha256": "eb6cdcca3551ac38d4c41b805a62ae2eca9fc6eb13f4b10285214a2c774cca0c",
+      "bytes": 7023
+    },
+    {
+      "rel": "content/store/support-policy.md",
+      "source": "/home/Jerry/.hermes/hermes-org/businesses/flash-apps/docs/store/support-policy.md",
+      "label": "support-policy.md",
+      "source_sha256": "6f38cb9a5292096ff015f4a9309668e3d551ee445c611d918fda67cdd5141cf1",
+      "copy_sha256": "86605a7917fbddc722aa69eb371244c9c3c1b07d4bf3b043501d550a8a93f269",
+      "bytes": 8516
+    },
+    {
+      "rel": "content/store/privacy-statement.md",
+      "source": "/home/Jerry/.hermes/hermes-org/businesses/flash-apps/docs/store/privacy-statement.md",
+      "label": "privacy-statement.md",
+      "source_sha256": "f9ff26a25a28960166fc7b9c4eae1586432b9c77cab910444e2fe280a85141b2",
+      "copy_sha256": "1be2b996ea448fc84647a57a0e700f8065866331d7cd9e41b3d716e1c360498b",
+      "bytes": 6426
+    },
+    {
+      "rel": "content/store/changelog.md",
+      "source": "/home/Jerry/apps/taskapp/CHANGELOG.md",
+      "label": "CHANGELOG.md",
+      "source_sha256": "2a9ea5bc7a6ef74f08378d358c75bed777dea507baa0da3508efe30c0367bb0d",
+      "copy_sha256": "2a9ea5bc7a6ef74f08378d358c75bed777dea507baa0da3508efe30c0367bb0d",
+      "bytes": 20223
+    },
+    {
+      "rel": "content/store/version.json",
+      "source": "/home/Jerry/apps/taskapp/VERSION",
+      "label": "VERSION",
+      "source_sha256": "16b76150c382d07b129220bfdf61df45bf049b21aba1096bfe0dd78fa5b47a7d",
+      "copy_sha256": "e203fdf9b901fd1788e28085dd53aa00deea2cff4de0964b2e7136deb117b055",
+      "bytes": 30
+    },
+    {
+      "rel": "public/apps/taskapp/hero-board-dark.png",
+      "source": "/home/Jerry/.hermes/hermes-org/businesses/flash-apps/assets/store/hero-board-dark.png",
+      "label": "hero-board-dark.png",
+      "source_sha256": "d0d57c9ed21596656748a05a28d9e379ab8f6265c6e69ab84608125b93db75ea",
+      "copy_sha256": "d0d57c9ed21596656748a05a28d9e379ab8f6265c6e69ab84608125b93db75ea",
+      "bytes": 164993
+    },
+    {
+      "rel": "public/apps/taskapp/focus-light.png",
+      "source": "/home/Jerry/.hermes/hermes-org/businesses/flash-apps/assets/store/focus-light.png",
+      "label": "focus-light.png",
+      "source_sha256": "242be5dd1a4853594da7215a601ce1f48f3f5bd5d4fb4da79199202b7057be95",
+      "copy_sha256": "242be5dd1a4853594da7215a601ce1f48f3f5bd5d4fb4da79199202b7057be95",
+      "bytes": 131342
+    },
+    {
+      "rel": "public/apps/taskapp/list-filters.png",
+      "source": "/home/Jerry/.hermes/hermes-org/businesses/flash-apps/assets/store/list-filters.png",
+      "label": "list-filters.png",
+      "source_sha256": "e2fe884331f634fc79845848c3e08d2a854df9814edcacdd1defa382bcc09512",
+      "copy_sha256": "e2fe884331f634fc79845848c3e08d2a854df9814edcacdd1defa382bcc09512",
+      "bytes": 137957
+    },
+    {
+      "rel": "public/apps/taskapp/task-drawer.png",
+      "source": "/home/Jerry/.hermes/hermes-org/businesses/flash-apps/assets/store/task-drawer.png",
+      "label": "task-drawer.png",
+      "source_sha256": "3402ad2ec3bc872b51d456328385f3c83404a21b4f561eeece974d6d47912b03",
+      "copy_sha256": "3402ad2ec3bc872b51d456328385f3c83404a21b4f561eeece974d6d47912b03",
+      "bytes": 189030
+    },
+    {
+      "rel": "public/apps/taskapp/mobile-board.png",
+      "source": "/home/Jerry/.hermes/hermes-org/businesses/flash-apps/assets/store/mobile-board.png",
+      "label": "mobile-board.png",
+      "source_sha256": "151f23db5bf1e801ebfbe210fa0453d1f3f2e3b6ef7a9a677284fdbde1cc54e0",
+      "copy_sha256": "151f23db5bf1e801ebfbe210fa0453d1f3f2e3b6ef7a9a677284fdbde1cc54e0",
+      "bytes": 75453
+    },
+    {
+      "rel": "public/apps/taskapp/og-image.png",
+      "source": "/home/Jerry/.hermes/hermes-org/businesses/flash-apps/assets/store/og-image.png",
+      "label": "og-image.png",
+      "source_sha256": "927746fb1cac48201d209c9530a7333dd9ec4292664b9bb6c61f8f1274260d09",
+      "copy_sha256": "927746fb1cac48201d209c9530a7333dd9ec4292664b9bb6c61f8f1274260d09",
+      "bytes": 190539
+    },
+    {
+      "rel": "public/apps/taskapp/demo.webm",
+      "source": "/home/Jerry/.hermes/hermes-org/businesses/flash-apps/assets/store/demo.webm",
+      "label": "demo.webm",
+      "source_sha256": "c1ba0ea31fa95aece821edb52a79791a7e2a72b75063e72c8a42445c341ba3cb",
+      "copy_sha256": "c1ba0ea31fa95aece821edb52a79791a7e2a72b75063e72c8a42445c341ba3cb",
+      "bytes": 301570
+    },
+    {
+      "rel": "public/apps/taskapp/demo.mp4",
+      "source": "/home/Jerry/.hermes/hermes-org/businesses/flash-apps/assets/store/demo.mp4",
+      "label": "demo.mp4",
+      "source_sha256": "715474598a439181f6a7ab283631c7ef839035958e8a680a0e0a8f268c28bfec",
+      "copy_sha256": "715474598a439181f6a7ab283631c7ef839035958e8a680a0e0a8f268c28bfec",
+      "bytes": 340169
+    },
+    {
+      "rel": "public/apps/taskapp/icon-512.png",
+      "source": "/home/Jerry/.hermes/hermes-org/businesses/flash-apps/assets/store/icon-512.png",
+      "label": "icon-512.png",
+      "source_sha256": "26884521bc1752c367fc0e5ee0e28f8421538ec9e588c086097657daf624a55a",
+      "copy_sha256": "26884521bc1752c367fc0e5ee0e28f8421538ec9e588c086097657daf624a55a",
+      "bytes": 12336
+    },
+    {
+      "rel": "public/apps/taskapp/icon-192.png",
+      "source": "/home/Jerry/.hermes/hermes-org/businesses/flash-apps/assets/store/icon-192.png",
+      "label": "icon-192.png",
+      "source_sha256": "187e9c7e2d9108d08324d813fed1c56ef0bf2e560b384fcd0ff83f71e95c2f5c",
+      "copy_sha256": "187e9c7e2d9108d08324d813fed1c56ef0bf2e560b384fcd0ff83f71e95c2f5c",
+      "bytes": 4191
+    },
+    {
+      "rel": "public/apps/taskapp/icon-32.png",
+      "source": "/home/Jerry/.hermes/hermes-org/businesses/flash-apps/assets/store/icon-32.png",
+      "label": "icon-32.png",
+      "source_sha256": "89a8be00a67185684db6f4441a0315af6f7792a7042b58017eae3066696dc7b1",
+      "copy_sha256": "89a8be00a67185684db6f4441a0315af6f7792a7042b58017eae3066696dc7b1",
+      "bytes": 751
+    },
+    {
+      "rel": "public/apps/taskapp/favicon.ico",
+      "source": "/home/Jerry/.hermes/hermes-org/businesses/flash-apps/assets/store/favicon.ico",
+      "label": "favicon.ico",
+      "source_sha256": "fd1ec541ee9b2b18d33ef8a842a1e05fdef500471695a57c623dc7e418664542",
+      "copy_sha256": "fd1ec541ee9b2b18d33ef8a842a1e05fdef500471695a57c623dc7e418664542",
+      "bytes": 2422
+    },
+    {
+      "rel": "public/apps/taskapp/icon.svg",
+      "source": "/home/Jerry/.hermes/hermes-org/businesses/flash-apps/assets/store/icon.svg",
+      "label": "icon.svg",
+      "source_sha256": "0c046dbcac92d44fea1ecb3bfbeed3d74e39bfbcbd45e6f177ca77768d4387ac",
+      "copy_sha256": "0c046dbcac92d44fea1ecb3bfbeed3d74e39bfbcbd45e6f177ca77768d4387ac",
+      "bytes": 341
+    }
+  ],
+  "markers": {
+    "jerry": 29,
+    "attorney": 16
+  }
+}

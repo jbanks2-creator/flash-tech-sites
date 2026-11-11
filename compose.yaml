@@ -2,7 +2,13 @@ name: flash-tech
 
 services:
   web:
-    build: ./web
+    build:
+      context: ./web
+      args:
+        STORE_LIVE: ${STORE_LIVE:-0}
+        STORE_DEMO_ORIGIN: ${STORE_DEMO_ORIGIN:-}
+        STORE_SUPPORT_EMAIL: ${STORE_SUPPORT_EMAIL:-}
+        LEMONSQUEEZY_CHECKOUT_URL: ${LEMONSQUEEZY_CHECKOUT_URL:-}
     container_name: flash-tech-web
     restart: unless-stopped
     mem_limit: 768m
@@ -10,6 +16,9 @@ services:
       - "127.0.0.1:3401:3000"
     environment:
       NODE_ENV: production
+      # Read per request by /apps/taskapp/buy, so a checkout link can be swapped without
+      # rebuilding the image. Never printed in the page.
+      LEMONSQUEEZY_CHECKOUT_URL: ${LEMONSQUEEZY_CHECKOUT_URL:-}
     networks: [flash-tech_net]
 
 networks:
