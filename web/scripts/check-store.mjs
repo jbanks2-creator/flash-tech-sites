@@ -21,6 +21,11 @@ const errors = [];
 const warnings = [];
 const err = (m) => errors.push(m);
 
+// `--built` runs after `next build` and inspects the rendered HTML. The source-level checks
+// below cannot see metadata Next generates (a relative og:image with no metadataBase ships as
+// http://localhost:3000/…), so that class of leak is only visible in the output.
+const built = process.argv.includes("--built");
+
 const live = process.env.STORE_LIVE === "1";
 const supportEmail = process.env.STORE_SUPPORT_EMAIL || "";
 const demoOrigin = process.env.STORE_DEMO_ORIGIN || "";
@@ -106,6 +111,55 @@ if (live) {
   if (!demoOrigin) warnings.push("STORE_DEMO_ORIGIN is unset — the demo block renders a placeholder");
   if (!supportEmail) warnings.push("STORE_SUPPORT_EMAIL is unset — the page points at the contact form instead of an address");
   if (!checkout) warnings.push("LEMONSQUEEZY_CHECKOUT_URL is unset — /apps/taskapp/buy returns its 'not configured' page");
+}
+
+/* ---- 5. rendered HTML (`--built`) ---------------------------------------- */
+if (built) {
+  const appHtml = join(WEB, ".next/server/app");
+  if (!existsSync(appHtml)) {
+    err(".next/server/app is missing — run `next build` before `check-store --built`");
+  } else {
+    const htmls = [];
+    const collect = (dir) => {
+      for (const entry of readdirSync(dir)) {
+        const full = join(dir, entry);
+        if (statSync(full).isDirectory()) collect(full);
+        else if (entry.endsWith(".html")) htmls.push(full);
+      }
+    };
+    collect(appHtml);
+    if (!htmls.length) err("no rendered HTML under .next/server/app — cannot verify the output");
+    for (const file of htmls) {
+      const text = readFileSync(file, "utf8");
+      // Metadata lives in <head>: that is where a generated URL can leak a loopback host.
+      // Prose is excluded on purpose — the TaskApp changelog legitimately quotes the dev
+      // ports its QA runs used, and rewriting release history to satisfy a linter is worse
+      // than the (harmless) mention.
+      const end = text.search(/<\/head>/i);
+      const head = end === -1 ? text : text.slice(0, end + 7);
+      if (/127\.0\.0\.1|localhost/i.test(head)) err(`rendered ${relative(WEB, file)} <head> contains a dev host literal`);
+      if (/:34\d\d\b/.test(head)) err(`rendered ${relative(WEB, file)} <head> contains a dev port literal`);
+      // Next's own fallback origin, the exact string that broke the social preview.
+      if (text.includes("localhost:3000")) err(`rendered ${relative(WEB, file)} contains Next's dev fallback host (metadataBase unset?)`);
+    }
+
+    const storeHtml = join(appHtml, "apps/taskapp.html");
+    if (!existsSync(storeHtml)) {
+      err("rendered store page apps/taskapp.html is missing");
+    } else {
+      const text = readFileSync(storeHtml, "utf8");
+      if (!text.includes("https://flashtech.biz/apps/taskapp/og-image.png")) {
+        err("store page og:image is not https://flashtech.biz/apps/taskapp/og-image.png (metadataBase unset?)");
+      }
+      if (!/property="og:url"/.test(text)) err("store page has no og:url");
+      if (!/rel="canonical"/.test(text)) err("store page has no canonical link");
+      // The defect this gate exists for: a page that offers a checkout which does not exist.
+      if (!live && /href="\/apps\/taskapp\/buy"/.test(text)) {
+        err("non-live store page links to /apps/taskapp/buy — a pre-sale page must not offer a checkout");
+      }
+    }
+    console.log(`check-store: rendered HTML scanned (${htmls.length} page${htmls.length === 1 ? "" : "s"})`);
+  }
 }
 
 for (const w of warnings) console.warn(`check-store: warning — ${w}`);

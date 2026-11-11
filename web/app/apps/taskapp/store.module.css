@@ -22,6 +22,10 @@
   letter-spacing: .06em; text-transform: uppercase;
 }
 
+/* Pre-sale state: the buy control is present but inert, so nobody can click through to a
+   checkout that does not exist. It reads as an unavailable button, not a link. */
+.buyDisabled { opacity: .55; cursor: not-allowed; }
+
 .hero { padding: 56px 0 40px; background:
   radial-gradient(900px 380px at 88% -20%, #e8efff 0%, transparent 62%),
   radial-gradient(620px 280px at 0% 0%, #f3f0ff 0%, transparent 58%), #fff; }

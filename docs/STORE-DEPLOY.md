@@ -13,7 +13,7 @@
 | `/apps/taskapp/legal/refund-policy` | refund policy |
 | `/apps/taskapp/legal/support-policy` | support policy |
 | `/apps/taskapp/legal/privacy-statement` | privacy statement |
-| `/apps/taskapp/buy` | redirects to the provider checkout, or an honest “not connected” page |
+| `/apps/taskapp/buy` | 303 to the provider checkout when one is configured; otherwise a customer-facing 404 (“not on sale yet”, `noindex`) — never an internal diagnostics page |
 | `/apps/taskapp/inquiry` | configured-tier inquiry form → `/api/taskapp-inquiry` |
 | `/apps/taskapp/icon-*`, `*.png`, `demo.webm` | store assets, copied by the sync script |
 
@@ -42,6 +42,21 @@ but **keeps** `[JERRY:]` / `[ATTORNEY:]` markers: a draft must look like a draft
 * a missing screenshot/video asset, a missing legal or changelog link,
 * and, when `STORE_LIVE=1`: a support address that is not an email, a demo origin that is not
   https, a checkout URL that is not https on `lemonsqueezy.com`, or any surviving marker.
+
+After `next build`, `check-store.mjs --built` scans the **rendered HTML** (added 2026-11-11, after
+a relative `og:image` shipped as `http://localhost:3000/…`): a loopback host in any page `<head>`,
+Next's dev fallback host anywhere, a store `og:image` that is not
+`https://flashtech.biz/apps/taskapp/og-image.png`, a missing `og:url`/canonical, or a non-live
+page linking `/apps/taskapp/buy` fails the build. `metadataBase` in `app/layout.jsx` is what makes
+those URLs absolute.
+
+## Pre-sale state
+
+While `STORE_LIVE` is unset the page is honest about it: buy controls render as inert “Not on sale
+yet”, the schema.org `Product` has no `offers`, and `/apps/taskapp/buy` 404s. Nothing to flip by
+hand — configuring a checkout URL and building with `STORE_LIVE=1` turns the real flow back on,
+and `check-store` refuses that build unless the support address, https demo origin and Lemon
+Squeezy URL are all real.
 
 ## Environment
 

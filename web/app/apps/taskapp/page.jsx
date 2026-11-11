@@ -15,19 +15,42 @@ const DEMO_ORIGIN =
     ? store.demoOrigin
     : "";
 
+// Sellable only when the build is live AND a checkout URL is configured. Until then every
+// buy affordance on this page is inert and honest: a live "Buy" button that lands on an error
+// page is a worse first impression than a page that says the product is not for sale yet.
+const CAN_BUY = store.live && store.checkoutConfigured;
+
 export const metadata = {
   title: "TaskApp — one-file task manager for small business",
   description:
     `A task app for small businesses that runs from one file on your own computer. No subscription, no account, no cloud. ${money(store.priceDownload)} once. Try the demo.`,
+  // The product page is a marketing page and stays indexable; only the checkout route is
+  // noindex. metadataBase (root layout) turns every relative URL below into flashtech.biz.
+  robots: { index: true, follow: true },
+  alternates: { canonical: "/apps/taskapp" },
   openGraph: {
     title: "TaskApp: every client, every job, one file",
     description: "Runs on your computer, works offline, no subscription. A Grayson County IT company answers the email.",
+    url: "/apps/taskapp",
+    siteName: "Flash Tech",
+    locale: "en_US",
     images: [{ url: OG, width: 1200, height: 630, alt: "TaskApp: every client, every job, one file, shown with a dark board view." }],
     type: "website",
   },
   twitter: { card: "summary_large_image", images: [OG] },
-  ...(store.live ? { alternates: { canonical: "https://flashtech.biz/apps/taskapp" } } : {}),
 };
+
+/** The buy control itself: a real link only when checkout exists, otherwise an inert chip. */
+function BuyButton({ className = "btn primary", label }) {
+  if (!CAN_BUY) {
+    return (
+      <span className={`${className} ${styles.buyDisabled}`} aria-disabled="true">
+        Not on sale yet
+      </span>
+    );
+  }
+  return <Link className={className} href={store.buyHref}>{label}</Link>;
+}
 
 function SupportLink() {
   if (store.supportEmail) {
@@ -169,13 +192,19 @@ export default function TaskAppStorePage() {
       "A single-file task manager for small businesses. Runs on your computer, works offline, no account and no subscription.",
     image: `https://flashtech.biz${OG}`,
     brand: { "@type": "Brand", name: store.brand },
-    offers: {
-      "@type": "Offer",
-      price: String(store.priceDownload),
-      priceCurrency: "USD",
-      availability: "https://schema.org/InStock",
-      url: "https://flashtech.biz/apps/taskapp",
-    },
+    // An Offer claiming InStock $49 while checkout is closed would be a lie to a search engine
+    // and would produce a rich result for something nobody can buy. Omit it until sale starts.
+    ...(CAN_BUY
+      ? {
+          offers: {
+            "@type": "Offer",
+            price: String(store.priceDownload),
+            priceCurrency: "USD",
+            availability: "https://schema.org/InStock",
+            url: "https://flashtech.biz/apps/taskapp",
+          },
+        }
+      : {}),
   };
 
   return (
@@ -192,9 +221,13 @@ export default function TaskAppStorePage() {
             <span style={{ color: "var(--ink)", fontWeight: 650 }}>TaskApp</span>
           </div>
           <nav className={styles.topnav}>
-            {store.testMode && <span className={styles.testChip}>Test mode</span>}
+            {!CAN_BUY && <span className={styles.testChip}>Not on sale yet</span>}
             <a className="btn ghost" href="#demo">Try the demo</a>
-            <a className="btn primary" href="#pricing">Buy — {money(store.priceDownload)}</a>
+            {CAN_BUY ? (
+              <a className="btn primary" href="#pricing">Buy — {money(store.priceDownload)}</a>
+            ) : (
+              <Link className="btn primary" href={store.contactHref}>Ask about TaskApp</Link>
+            )}
           </nav>
         </div>
       </header>
@@ -211,7 +244,11 @@ export default function TaskAppStorePage() {
               </p>
               <div className={styles.ctaRow}>
                 <a className="btn primary" href="#demo">Try the demo — no email needed</a>
-                <a className="btn ghost" href="#pricing">Buy the download — {money(store.priceDownload)}</a>
+                {CAN_BUY ? (
+                  <a className="btn ghost" href="#pricing">Buy the download — {money(store.priceDownload)}</a>
+                ) : (
+                  <Link className="btn ghost" href={store.contactHref}>Ask when it&apos;s available</Link>
+                )}
               </div>
               <div className={styles.heroMeta}>
                 <span><b>{money(store.priceDownload)}</b> once</span>
@@ -433,7 +470,11 @@ export default function TaskAppStorePage() {
           <div className="wrap">
             <div className={styles.sectionLead}>
               <h2>Pricing</h2>
-              <p>Two ways to buy. Both are one-time payments — there is no subscription.</p>
+              <p>
+                {CAN_BUY
+                  ? "Two ways to buy. Both are one-time payments — there is no subscription."
+                  : "Two ways to buy, one-time payments, no subscription — but TaskApp is not on sale yet. These are the planned prices; checkout is not open, so nothing can be ordered or charged today."}
+              </p>
             </div>
             <div className={styles.pricingGrid}>
               <div className={`${styles.tier} ${styles.lead}`}>
@@ -447,10 +488,14 @@ export default function TaskAppStorePage() {
                   <dt>Refund</dt><dd>{store.refundDays} days, no questions asked.</dd>
                   <dt>Licence</dt><dd>One named user, one computer. Moving computers is fine if the old copy is removed.</dd>
                 </dl>
-                <Link className="btn primary" href={store.buyHref}>Download TaskApp — {money(store.priceDownload)}</Link>
+                <BuyButton label={`Download TaskApp — ${money(store.priceDownload)}`} />
                 <p className={styles.tierNote}>
-                  Checkout is {store.testMode ? "in test mode: no card is charged" : "handled by Lemon Squeezy, the merchant of record"}.
-                  {" "}Tax is calculated at checkout.
+                  {CAN_BUY ? (
+                    <>Checkout is handled by Lemon Squeezy, the merchant of record. Tax is calculated at checkout.</>
+                  ) : (
+                    <>Not on sale yet: checkout is not open, so nothing can be ordered or charged.{" "}
+                      <Link href={store.contactHref}>Ask us to tell you when it opens.</Link></>
+                  )}
                 </p>
               </div>
 
@@ -503,7 +548,13 @@ export default function TaskAppStorePage() {
               <p><strong>Backup discipline.</strong> The app nags after seven days, saves a copy before every import and writes a file you can read in a text editor. A generated app usually leaves that to you.</p>
               <p><strong>A version number.</strong> You know what you are running, and what changed.</p>
               <p>If none of that is worth {money(store.priceDownload)} to you, build it yourself. That is a reasonable answer, and we would rather you decide it before you buy than after.</p>
-              <p style={{ marginBottom: 0 }}><a className="btn primary" href="#pricing" style={{ marginTop: 8 }}>Buy the download — {money(store.priceDownload)}</a></p>
+              <p style={{ marginBottom: 0 }}>
+                {CAN_BUY ? (
+                  <a className="btn primary" href="#pricing" style={{ marginTop: 8 }}>Buy the download — {money(store.priceDownload)}</a>
+                ) : (
+                  <Link className="btn primary" style={{ marginTop: 8 }} href={store.contactHref}>Ask us to tell you when it&apos;s on sale</Link>
+                )}
+              </p>
             </div>
           </div>
         </section>
@@ -543,7 +594,11 @@ export default function TaskAppStorePage() {
             <div>
               <h4>Buying</h4>
               <ul>
-                <li><Link href={store.buyHref}>Download — {money(store.priceDownload)}</Link></li>
+                <li>
+                  {CAN_BUY
+                    ? <Link href={store.buyHref}>Download — {money(store.priceDownload)}</Link>
+                    : <span>Download — not on sale yet</span>}
+                </li>
                 <li><Link href={store.contactHref}>Configured — {money(store.priceConfigured)}</Link></li>
                 <li><Link href="/contact">Contact Flash Tech</Link></li>
               </ul>
@@ -551,7 +606,7 @@ export default function TaskAppStorePage() {
           </div>
           <div className={styles.fine}>
             <span>TaskApp {VERSION} · {store.brand} · Checkout by Lemon Squeezy (merchant of record)</span>
-            <span>{store.testMode ? "Test-mode build — not a public launch." : `© ${new Date().getFullYear()} Flash Tech`}</span>
+            <span>{CAN_BUY ? `© ${new Date().getFullYear()} Flash Tech` : "Not on sale yet — checkout opens soon."}</span>
           </div>
         </div>
       </footer>
