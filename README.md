@@ -264,6 +264,7 @@ LICENSE                     licence-not-sale statement, points at the EULA
 CHANGELOG.md                what changed, per version
 scripts/build.sh            dist artifact + checksum + README.txt (deterministic)
 scripts/build-demo.sh       installs the release artifact as demo/site.html for the website demo
+scripts/package-upload.sh   dist/TaskApp-<version>.zip for the checkout product (reproducible)
 scripts/build-archive.sh    an old release into dist/archive/<version>/ with its own README
 scripts/check-dist.sh       asserts every html in dist/ has its own README + verifying .sha256
 scripts/embed-demo.mjs      keeps embedded DEMO_DATA identical to demo-data.json

@@ -13,6 +13,8 @@ services:
     volumes:
       - ./index.html:/usr/share/nginx/html/index.html:ro
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "127.0.0.1:3601:80"
     networks:
       - taskapp_net
 
