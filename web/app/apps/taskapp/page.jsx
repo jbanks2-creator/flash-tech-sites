@@ -7,6 +7,14 @@ import styles from "./store.module.css";
 const VERSION = getVersion();
 const OG = "/apps/taskapp/og-image.png";
 
+// A public page must never frame a non-https origin: an http:// frame is blocked as mixed content
+// on an https:// page, and a loopback origin would point at the visitor's own machine instead of
+// ours. `next dev` keeps the developer's local demo URL; a production build frames only https.
+const DEMO_ORIGIN =
+  store.demoOrigin && (process.env.NODE_ENV !== "production" || store.demoOrigin.startsWith("https://"))
+    ? store.demoOrigin
+    : "";
+
 export const metadata = {
   title: "TaskApp — one-file task manager for small business",
   description:
@@ -29,21 +37,22 @@ function SupportLink() {
 }
 
 function Demo() {
-  if (!store.demoOrigin) {
+  const origin = DEMO_ORIGIN;
+  if (!origin) {
     return (
       <div className={styles.demoShell}>
         <div className={styles.demoBanner}>
-          <span><b>DEMO</b> — the live demo is not connected on this host.</span>
+          <span><b>DEMO</b> — the interactive demo is being finished.</span>
         </div>
         <p className={styles.demoFallback}>
-          The demo runs at its own address so it can never touch your browser storage on this site.
-          It is switched on when <code>STORE_DEMO_ORIGIN</code> is set. In the meantime you can watch the
-          10-second animation below.
+          The demo opens at its own address so it can never touch your browser storage on this site.
+          It is not connected here yet — watch the 10-second animation below, or ask us for a
+          walkthrough through the contact form.
         </p>
       </div>
     );
   }
-  const src = `${store.demoOrigin}/?demo=1&v=${encodeURIComponent(VERSION)}`;
+  const src = `${origin}/?demo=1&v=${encodeURIComponent(VERSION)}`;
   return (
     <div className={styles.demoShell}>
       <div className={styles.demoBar}>
@@ -233,8 +242,9 @@ export default function TaskAppStorePage() {
           <div className="wrap">
             <Demo />
             <p className={styles.ctaNote}>
-              Prefer to watch? The animation below shows quick-add and drag-to-done. The demo above is
-              the actual app — click anything.
+              {DEMO_ORIGIN
+                ? "Prefer to watch? The animation below shows quick-add and drag-to-done. The demo above is the actual app — click anything."
+                : "The animation below shows quick-add and drag-to-done in the real app, at 10 seconds. The interactive demo opens here once its own address is live."}
             </p>
             <div style={{ marginTop: 18 }}>
               <video
