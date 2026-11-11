@@ -218,7 +218,7 @@ export default function TaskAppStorePage() {
             <span className={styles.sep}>/</span>
             <span className={styles.crumbApps}>Apps</span>
             <span className={styles.sep}>/</span>
-            <span style={{ color: "var(--ink)", fontWeight: 650 }}>TaskApp</span>
+            <span className={styles.crumbCurrent} style={{ color: "var(--ink)", fontWeight: 650 }}>TaskApp</span>
           </div>
           <nav className={styles.topnav}>
             {!CAN_BUY && <span className={styles.testChip}>Not on sale yet</span>}

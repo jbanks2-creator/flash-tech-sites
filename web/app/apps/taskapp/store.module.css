@@ -170,6 +170,14 @@
   .checks { grid-template-columns: 1fr; }
   .demoFrame { height: 560px; }
   .footerCols { gap: 24px; }
+
+  /* The header carries a real primary action ("Ask about TaskApp") while the store is
+     pre-sale; drop the duplicate demo link earlier and stop the chip and crumb wrapping,
+     so the top bar stays one line down to the 640px rules. The hero's demo button is the
+     same target and is visible on the same screen. */
+  .topnav a[href="#demo"] { display: none; }
+  .testChip { white-space: nowrap; }
+  .crumb .logo { white-space: nowrap; }
 }
 @media (max-width: 640px) {
   .hero { padding: 34px 0 26px; }
@@ -188,6 +196,9 @@
   .crumb { min-width: 0; overflow: hidden; white-space: nowrap; gap: 4px; font-size: .82rem; }
   .crumb .logo { flex: none; }
   .crumbApps, .sep { display: none; }
+  /* The header's primary action is wider in pre-sale state ("Ask about TaskApp"), so drop the
+     current-page crumb too: a clipped "TaskA…" against the button reads as a layout bug. */
+  .crumbCurrent { display: none; }
   .topnav { flex: none; gap: 6px; }
   .topnav a[href="#demo"] { display: none; }
   .topnav .btn { padding: 9px 12px; font-size: .82rem; }
