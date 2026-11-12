@@ -158,7 +158,57 @@ if (built) {
         err("non-live store page links to /apps/taskapp/buy — a pre-sale page must not offer a checkout");
       }
     }
-    console.log(`check-store: rendered HTML scanned (${htmls.length} page${htmls.length === 1 ? "" : "s"})`);
+    // The crawler-facing files. Their absence is silent — a 404 sitemap reads as "nothing to
+    // report" rather than as a defect, which is exactly how the site shipped without one. So
+    // assert the generated bodies: present, well-formed enough, and naming only public routes.
+    const findOutput = (prefix) => {
+      const hits = [];
+      const walkDir = (dir) => {
+        for (const entry of readdirSync(dir)) {
+          const full = join(dir, entry);
+          if (statSync(full).isDirectory()) walkDir(full);
+          else if (entry.startsWith(prefix)) hits.push(full);
+        }
+      };
+      walkDir(appHtml);
+      return hits.sort()[0] || null;
+    };
+
+    const robotsFile = findOutput("robots.txt");
+    if (!robotsFile) err("/robots.txt was not generated — app/robots.js did not build");
+    else {
+      // Field names in robots.txt are case-insensitive; Next writes `User-Agent:`, the spec
+      // examples write `User-agent:`. Compare lowercased rather than pin a capitalisation.
+      const text = readFileSync(robotsFile, "utf8").toLowerCase();
+      for (const needle of ["user-agent: *", "sitemap: https://flashtech.biz/sitemap.xml"]) {
+        if (!text.includes(needle)) err(`/robots.txt is missing ${JSON.stringify(needle)}`);
+      }
+      if (!/^allow: \/$/m.test(text)) err("/robots.txt does not allow the site root");
+      if (!/^disallow: \/api\/$/m.test(text)) err("/robots.txt does not disallow /api/");
+      if (!/^disallow: \/apps\/taskapp\/buy$/m.test(text)) err("/robots.txt does not exclude the checkout redirect");
+    }
+
+    const sitemapFile = findOutput("sitemap.xml");
+    if (!sitemapFile) err("/sitemap.xml was not generated — app/sitemap.js did not build");
+    else {
+      const text = readFileSync(sitemapFile, "utf8");
+      if (!/<urlset[^>]+sitemaps\.org\/schemas\/sitemap\/0\.9/.test(text)) err("/sitemap.xml is not a sitemap 0.9 urlset");
+      const locs = [...text.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]).sort();
+      const expected = ["https://flashtech.biz/", "https://flashtech.biz/apps/taskapp",
+        "https://flashtech.biz/contact", "https://flashtech.biz/startups",
+        "https://flashtech.biz/startups/authors"].sort();
+      if (locs.join("\n") !== expected.join("\n")) {
+        err(`/sitemap.xml lists the wrong URLs (got ${JSON.stringify(locs)})`);
+      }
+    }
+    for (const file of [robotsFile, sitemapFile].filter(Boolean)) {
+      const text = readFileSync(file, "utf8");
+      if (/127\.0\.0\.1|localhost|:34\d\d\b|\{\{[A-Z_]+\}\}/.test(text)) {
+        err(`${relative(WEB, file)} contains a dev host/port or an unfilled token`);
+      }
+    }
+
+    console.log(`check-store: rendered HTML scanned (${htmls.length} page${htmls.length === 1 ? "" : "s"}), crawler files asserted`);
   }
 }
 

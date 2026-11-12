@@ -46,10 +46,43 @@ To make it live (after MX/SPF/DKIM exist on flashtech.biz):
 
 ## Known gaps
 
-- Domain still points at the GoDaddy builder placeholder; this site is reachable only through the tunnel.
-- No analytics, no favicon, no OG image, no sitemap.
+- No analytics, no favicon, no OG image (no `og:image` on any page, home included — a copy and
+  asset decision, still open).
 - Brand palette is a placeholder (navy/electric blue) pending a real brand file.
 - `The Wiz` section is a teaser; character art does not exist.
+- `/` and `/contact` carry no `rel="canonical"` (the store and startups pages do). Pre-existing,
+  not yet fixed.
+
+## Crawler files: /robots.txt and /sitemap.xml
+
+Both are Next.js metadata routes, so they are generated and cannot drift from the route list:
+
+| File | What it says |
+|---|---|
+| `web/lib/site.mjs` | The public origin plus the one `PUBLIC_ROUTES` list both routes read. |
+| `web/app/sitemap.js` | The five public routes (`/`, `/apps/taskapp`, `/startups`, `/startups/authors`, `/contact`) with `lastmod` from each page's last source change. |
+| `web/app/robots.js` | `User-agent: *`, `Allow: /`, `Disallow: /api/` (form handlers), `Disallow: /apps/taskapp/buy` (checkout redirect), `Sitemap: https://flashtech.biz/sitemap.xml`. |
+
+`web/scripts/check-store.mjs --built` (run by `docker compose build`) asserts the generated bodies:
+both files exist, the robots directives are present, the sitemap contains exactly those five
+`<loc>` values, and neither file carries a dev host/port or an unfilled `{{TOKEN}}`. Deleting a
+metadata route therefore fails the build instead of silently shipping a 404 sitemap.
+
+**What Cloudflare does to them (measured 2026-11-12):** the zone used to answer `/robots.txt`
+with 200 and Cloudflare's content-signals comment block even though the container 404'd it. Once
+the origin serves a real file, the edge serves **our file byte-for-byte** (111 B, identical for a
+Googlebot User-Agent, `cf-cache-status: EXPIRED`) — Cloudflare does not merge its block into an
+origin `robots.txt`, it only substitutes one when the origin has none. Two consequences:
+
+1. The Cloudflare content-signals comment block is **no longer served**. It was comment-only (no
+   effect on crawling), but it is a rights statement; restoring it means either pasting it into
+   `app/robots.js` or flipping the zone's content-signals setting — Jerry's call.
+2. The edge caches `robots.txt` for 4 hours (`cache-control: public, max-age=14400`), so an edit
+   to the file can take up to that long to appear at `https://flashtech.biz/robots.txt`. Purge the
+   URL in the dashboard when that matters.
+
+Cloudflare's bot protection answers `python-urllib`'s default User-Agent with 403 on this zone;
+use `curl` (or a browser UA) when verifying from a script.
 
 ## TaskApp storefront
 
