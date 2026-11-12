@@ -21,8 +21,16 @@ services:
       LEMONSQUEEZY_CHECKOUT_URL: ${LEMONSQUEEZY_CHECKOUT_URL:-}
       # The Author's Candle applications (/api/authors-apply) are written here, one JSON file each.
       AUTHORS_INBOX: /data/author-inquiries
+      # The Starter questionnaire (/api/authors-intake) validates every submission against the
+      # pipeline's own schema, mounted read-only below, so a stored intake runs through
+      # scripts/validate_intake.py without editing.
+      INTAKE_SCHEMA: /app/schema/intake-starter-v1.json
+      # Cover image + approved voice-over line (card t_7487852d) stay OFF until that card lands
+      # their fields in intake/schema.json. See COVER_VO_ENABLED in web/lib/intake-fields.mjs.
+      INTAKE_COVER_VO: ${INTAKE_COVER_VO:-off}
     volumes:
       - /home/Jerry/businesses/author-marketing/inquiries:/data/author-inquiries
+      - /home/Jerry/businesses/author-marketing/intake/schema.json:/app/schema/intake-starter-v1.json:ro
     networks: [flash-tech_net]
 
 networks:

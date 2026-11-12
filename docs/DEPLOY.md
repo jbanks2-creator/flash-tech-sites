@@ -84,6 +84,44 @@ origin `robots.txt`, it only substitutes one when the origin has none. Two conse
 Cloudflare's bot protection answers `python-urllib`'s default User-Agent with 403 on this zone;
 use `curl` (or a browser UA) when verifying from a script.
 
+## The author intake form: /startups/authors/intake
+
+The Starter Kit questionnaire for The Author's Candle. One author at a time, sent as a link by the
+owner — **not** a marketing page:
+
+- `web/app/startups/authors/intake/page.jsx` + `IntakeForm.jsx` — nine sections, all questions from
+  `~/businesses/author-marketing/intake/questionnaire.html`. `robots: noindex, nofollow`, and the
+  route is deliberately absent from `PUBLIC_ROUTES`, so `/sitemap.xml` cannot advertise it.
+- `web/app/api/authors-intake/route.js` — `POST` handler. Reads only the answer fields listed in
+  `web/lib/intake-fields.mjs` (`LIMITS`); **no IP, user-agent, referrer or headers are stored or
+  logged**. Honeypot input is named `website`; a bot that fills it gets a 200 and nothing is written.
+  Per-field caps: 200 chars on short answers, 4,000 on prose, 512 KB per request. There is no rate
+  limit (by design) — the caps are what stop the disk filling.
+- Each accepted submission is validated with AJV against
+  `~/businesses/author-marketing/intake/schema.json`, **mounted read-only** at
+  `/app/schema/intake-starter-v1.json` (`INTAKE_SCHEMA`), then written as one JSON file named
+  `<job_id>.json` into `~/businesses/author-marketing/inquiries/intake/`
+  (`AUTHORS_INBOX=/data/author-inquiries`). A refused submission names the exact fields and writes
+  nothing. Records set `meta.is_sample=false`, `meta.package="starter"`, `meta.intake_version="starter-v1"`.
+- `job_id` is the author's public name as a slug plus a 5-character random suffix
+  (`erick-williams-4k2p9`), so a file cannot land on top of another.
+
+**Schema changes are deliberate.** The schema is read from the host file at container start, so an
+edit to `intake/schema.json` takes effect on `docker compose up -d web` — no rebuild. The route logs
+`authors-intake-schema-version-mismatch` when the mounted `$id` is not the `SCHEMA_ID` in
+`web/lib/intake-fields.mjs`. The cover-image and voice-over fields (card `t_7487852d`) are **not**
+collected yet: `COVER_VO_ENABLED` is off, with the exact attach points marked `TODO(t_7487852d)` in
+`lib/intake-fields.mjs`, `route.js` and `IntakeForm.jsx`. Do not add an input for a field the
+schema does not declare — `additionalProperties: false` means the submission would be refused and
+the author's answers lost.
+
+Verify it (Cloudflare answers `python-urllib`'s default UA with 403, so use curl or a browser UA):
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' https://flashtech.biz/startups/authors/intake   # 200
+curl -s https://flashtech.biz/sitemap.xml | grep -c intake                               # 0
+```
+
 ## TaskApp storefront
 
 `/apps/taskapp` is documented separately in [`STORE-DEPLOY.md`](STORE-DEPLOY.md): routes, the

@@ -21,6 +21,10 @@ export const SITE_URL = "https://flashtech.biz";
  *   /apps/taskapp/legal/*    DRAFT legal documents: noindex meta until the store goes live
  *   /apps/taskapp/changelog  release history, noindex in test mode
  *   /apps/taskapp/inquiry    a form endpoint page, noindex in test mode
+ *   /startups/authors/intake  the Starter questionnaire: a form sent to one author at a time,
+ *                             `robots: noindex` in its own metadata and deliberately unlinked.
+ *                             scripts/check-store.mjs pins the five routes below, so this list is
+ *                             the only way into the sitemap — adding nothing is the guarantee.
  *   /api/*                   form handlers, disallowed in robots.txt as well
  */
 export const PUBLIC_ROUTES = [
