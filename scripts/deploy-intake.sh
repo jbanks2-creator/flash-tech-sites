@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Rebuild and restart the flash-tech `web` service only, for the author intake form.
-# Tagged rollback image: flash-tech-web:pre-intake-verify-20261112T214433Z
-# Rollback source:      ~/backups/flash-tech/flash-tech-src-20261112T212644Z.tar.gz
+# Tagged rollback image: flash-tech-web:pre-covervo-20261112T223704Z
+# Rollback source:      ~/backups/flash-tech/flash-tech-src-20261112T223704Z.tar.gz
 set -u -o pipefail
 cd /home/Jerry/apps/flash-tech || exit 1
 

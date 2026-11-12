@@ -41,7 +41,7 @@ export const HONEYPOT = "hp_website";
 export const MAX_BODY_BYTES = 512 * 1024;
 
 export const PACKAGE = "starter";
-export const INTAKE_VERSION = "starter-v1";
+export const INTAKE_VERSION = "starter-v2";
 
 /**
  * The `$id` of the schema this build collects answers for (see intake/schema.json).
@@ -50,19 +50,27 @@ export const INTAKE_VERSION = "starter-v1";
  * declares a different `$id`, route.js logs it — a schema change must be a deliberate code change
  * here, never something a submission quietly falls out of step with.
  */
-export const SCHEMA_ID = "intake-starter-v1";
+export const SCHEMA_ID = "intake-starter-v2";
 
 /**
- * Cover image + approved voice-over line — the two fields the cover-video product needs
- * (kanban card t_7487852d, owner: ops). OFF until that card lands the fields in
- * intake/schema.json, because the record refuses fields it does not know
- * (`additionalProperties: false`) and the form must never show a box whose answer is dropped.
+ * Cover image + approved voice-over line — the two answers the cover-video product needs
+ * (schema v2, card t_7487852d landed the fields, this card t_87bb5c11 wired them).
  *
- * To switch on, in this order:
- *   1. copy the exact field names from the landed schema — do NOT guess them,
- *   2. set them here (buildIntake, marked TODO) and on the page (IntakeForm, marked TODO),
- *   3. bump INTAKE_VERSION / SCHEMA_ID to the schema's new `$id`,
- *   4. set INTAKE_COVER_VO=on in compose.yaml and rebuild web.
+ * ON, and it has to stay on for the form inputs to mean anything: this flag decides whether
+ * buildIntake() writes the six fields into `book` at all. A box the author can see whose answer is
+ * then dropped is the exact failure this flag exists to prevent — and the record is mounted with
+ * `additionalProperties: false`, so writing a name the mounted schema does not declare turns every
+ * submission into a refusal.
+ *
+ * Three places must agree, which is why the flag is read here and passed to the page rather than
+ * guessed in the browser bundle (a `process.env` read inside a "use client" component is resolved
+ * at BUILD time, not per request):
+ *   - compose.yaml   INTAKE_COVER_VO=on  (runtime env for the route and buildIntake)
+ *   - page.jsx       passes COVER_VO_ENABLED into IntakeForm as a prop (page is force-dynamic)
+ *   - IntakeForm     renders the section-4 block only when that prop is true
+ *
+ * The record itself is `intake-starter-v2`; SCHEMA_ID / INTAKE_VERSION above move with it, and
+ * route.js warns when the mounted schema disagrees.
  */
 export const COVER_VO_ENABLED = clean(process.env.INTAKE_COVER_VO) === "on";
 
@@ -86,9 +94,10 @@ export const MIN_TALKING_POINTS = 3;
 export const MAX_TALKING_POINTS = 5;
 
 /**
- * Every answer the form posts, with its cap in characters. Two caps only, on purpose: 200 for
- * anything a person types into a one-line box, 4,000 for prose. The handler refuses a field over
- * its cap instead of quietly cutting the end off somebody's writing.
+ * Every answer the form posts, with its cap in characters. The handler refuses a field over its
+ * cap instead of quietly cutting the end off somebody's writing. Four caps, on purpose: 200 for
+ * anything a person types into a one-line box, 400 for the spoken voice-over line (the schema's
+ * own maxLength), 500 for a URL pasted off a retailer page, 4,000 for prose.
  */
 export const LIMITS = Object.freeze({
   // 1. About you
@@ -112,6 +121,12 @@ export const LIMITS = Object.freeze({
   review1_quote: LONG, review1_source: SHORT, review1_permission: SHORT,
   review2_quote: LONG, review2_source: SHORT, review2_permission: SHORT,
   content_warnings: SHORT,
+  // 4b. Cover image and voice-over line (optional; all six are schema v2 fields inside `book`).
+  // cover_permission is a checkbox ("on" or absent) and vo_approved_date is a type="date" input,
+  // so both only need the short cap — every key here is read off the body by route.js, which is
+  // why they must live in this list at all.
+  cover_file: SHORT, cover_url: 500, cover_permission: SHORT,
+  vo_line: 400, vo_approved_by: SHORT, vo_approved_date: SHORT,
   // 5. Your readers
   ideal_reader: LONG, problem_or_desire: LONG, where_spend_time: LONG, demographics: SHORT,
   authors_shows_followed: LONG, email_list_size: SHORT,
@@ -173,6 +188,8 @@ const NAMES = {
   cta_action: "Call to action", cta_link: "Call-to-action link", tried_before: "Marketing you've tried",
   podcasts_wanted: "Podcasts you'd love to be on", peers_admired: "Authors whose marketing you admire",
   consent_facts: "Facts are accurate", consent_ai: "AI drafting understood", consent_images: "Image rights",
+  cover_file: "Cover image file name", cover_url: "Cover link", cover_permission: "Cover permission",
+  vo_line: "Voice-over line", vo_approved_by: "Voice-over line approved by", vo_approved_date: "Voice-over approval date",
 };
 
 /** Human names for the record's own paths, used to translate schema errors. */
@@ -185,6 +202,9 @@ const PATH_NAMES = {
   book: "Your book", "book.plot_summary": "Full plot summary", "book.nonfiction_summary": "Chapter list or summary",
   "book.themes": "Themes", "book.platform": "Where it's published", "book.publication_date": "Publication date",
   "book.reviews_endorsements": "Reviews and endorsements", "book.retailer_links": "Retailer links",
+  "book.cover_file": "Cover image file name", "book.cover_url": "Cover link",
+  "book.cover_permission": "Cover permission", "book.vo_line": "Voice-over line",
+  "book.vo_approved_by": "Voice-over line approved by", "book.vo_approved_date": "Voice-over approval date",
   audience: "Your readers", "audience.where_they_spend_time": "Where readers spend time",
   website: "Website", "website.url": "Website address", social: "Social media",
   "social.active_platforms": "Social platforms and handles", marketing: "Goals and podcast topics",
@@ -353,6 +373,9 @@ export function buildIntake(raw, { jobId, submittedDate }) {
   const themes = ["theme1", "theme2", "theme3", "theme4", "theme5"].map(t).filter(Boolean);
   const talking = ["talking1", "talking2", "talking3", "talking4", "talking5"].map(t).filter(Boolean);
   const fiction = t("book_type") === "fiction";
+  /** Did the author actually supply a cover (a file name or a link)? Decides whether an unticked
+   *  permission box is worth recording as `false` — see the cover_permission line in `book`. */
+  const coverRecorded = Boolean(t("cover_file") || t("cover_url"));
 
   const book = {
     title: t("book_title"),
@@ -380,23 +403,27 @@ export function buildIntake(raw, { jobId, submittedDate }) {
     ...(commas(t("comparable_titles")).length ? { comparable_titles: commas(t("comparable_titles")) } : {}),
     ...(reviewsFrom(raw).length ? { reviews_endorsements: reviewsFrom(raw) } : {}),
     ...(t("content_warnings") ? { content_warnings: t("content_warnings") } : {}),
+    // 4b. Cover image and voice-over line (schema v2, card t_87bb5c11; every one is optional).
+    // Written into `book` beside cover_file only while COVER_VO_ENABLED is on: the mounted record
+    // refuses a property it does not declare (`additionalProperties: false`), so the flag, the
+    // mounted schema and the six rendered inputs have to move together.
+    ...(COVER_VO_ENABLED && t("cover_file") ? { cover_file: t("cover_file") } : {}),
+    ...(COVER_VO_ENABLED && t("cover_url") ? { cover_url: t("cover_url") } : {}),
+    // A tick is `true`. An unticked box is recorded as `false` only when a cover was actually
+    // supplied — that is what lets validate_intake.py raise "a cover is recorded but permission is
+    // not confirmed" instead of guessing. With no cover at all the key is omitted entirely, which
+    // the schema accepts: absent means we never asked, false means they had the chance and didn't.
+    ...(COVER_VO_ENABLED && checked(raw.cover_permission) ? { cover_permission: true } : {}),
+    ...(COVER_VO_ENABLED && !checked(raw.cover_permission) && coverRecorded ? { cover_permission: false } : {}),
+    ...(COVER_VO_ENABLED && t("vo_line") ? { vo_line: t("vo_line") } : {}),
+    ...(COVER_VO_ENABLED && t("vo_approved_by") ? { vo_approved_by: t("vo_approved_by") } : {}),
+    ...(COVER_VO_ENABLED && t("vo_approved_date") ? { vo_approved_date: t("vo_approved_date") } : {}),
   };
 
-  // TODO(t_7487852d): the cover image (retailer URL + permission to use it) and the approved
-  // voice-over line attach HERE, inside `book` — beside cover_file, the field the schema already
-  // has reserved for a cover. They are deliberately not written yet: the mounted schema declares
-  // `additionalProperties: false`, so writing a name it does not know turns every submission into
-  // a refusal. When ops lands the fields in intake/schema.json:
-  //   - copy the names verbatim from that file (do not guess them),
-  //   - add them to LIMITS above (short-cap the URL/permission, 4,000-cap the voice-over line),
-  //   - write them here under `COVER_VO_ENABLED`, and read them in the route's `raw` map,
-  //   - add the inputs to IntakeForm.jsx (section 4, marked TODO there).
-  // A low-resolution cover is a needs-human flag for the renderer, never a hard stop: do not add a
-  // check that refuses a submission over it.
-  if (COVER_VO_ENABLED) {
-    // Intentionally empty until the schema lands. Anything written here without the schema's
-    // own field names would be refused by the validator and lose the author's answers.
-  }
+  // Nothing here is required. A low-resolution cover, a URL with no file, a line nobody has
+  // approved and a line over 25 words are all needs-human flags raised by
+  // scripts/validate_intake.py — never a refusal at this door, because refusing would lose the
+  // author's other thirty answers over an attachment.
 
   const marketing = {
     primary_goal: t("primary_goal"),
@@ -572,6 +599,18 @@ export function checkAnswers(raw) {
     if (quote && !source) fail(`review${n}_source`, "is required when you paste a quote: say who said it.");
     if (source && !quote) fail(`review${n}_quote`, "is required when you give a source: paste what they said.");
   });
+
+  // 4b. Cover image and voice-over line — optional, every one. Nothing here refuses a submission
+  // for an answer the author simply did not give; a weak cover or an unapproved line is a
+  // needs-human flag raised by scripts/validate_intake.py. What IS refused is a value that is
+  // present and unusable (the schema would refuse it anyway — this just names it in plain English
+  // before the record is built).
+  if (!blank(raw.cover_url) && !isHttpUrl(raw.cover_url)) {
+    fail("cover_url", "should start with http:// or https:// — or leave it blank.");
+  }
+  if (!blank(raw.vo_approved_date) && !isDate(raw.vo_approved_date)) {
+    fail("vo_approved_date", "should be a real date, in the form YYYY-MM-DD.");
+  }
 
   // 5. Your readers
   req("ideal_reader"); req("problem_or_desire"); req("where_spend_time");

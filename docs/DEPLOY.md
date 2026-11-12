@@ -115,18 +115,32 @@ owner — **not** a marketing page:
   `/app/schema/intake-starter-v1.json` (`INTAKE_SCHEMA`), then written as one JSON file named
   `<job_id>.json` into `~/businesses/author-marketing/inquiries/intake/`
   (`AUTHORS_INBOX=/data/author-inquiries`). A refused submission names the exact fields and writes
-  nothing. Records set `meta.is_sample=false`, `meta.package="starter"`, `meta.intake_version="starter-v1"`.
+  nothing. Records set `meta.is_sample=false`, `meta.package="starter"`,
+  `meta.intake_version="starter-v2"` (`SCHEMA_ID`/`INTAKE_VERSION` in `web/lib/intake-fields.mjs`).
 - `job_id` is the author's public name as a slug plus a 5-character random suffix
   (`erick-williams-4k2p9`), so a file cannot land on top of another.
+
+**The cover image and voice-over line are collected (schema v2, cards `t_7487852d` + `t_87bb5c11`).**
+Section 4 ends with an explicitly optional block: `cover_file`, `cover_url`, `cover_permission`,
+`vo_line`, `vo_approved_by`, `vo_approved_date` — all six inside `book`, none of them required. The
+form posts them exactly as the schema names them (`LIMITS` in `web/lib/intake-fields.mjs` is the one
+list the browser form and the route share). A weak cover, a URL with no file, a line nobody approved
+or a line over 25 words are `needs_human` entries in `qa/validation.json` — never a refusal, because
+refusing would cost the author's other thirty answers over an attachment.
+
+`INTAKE_COVER_VO=on` (compose.yaml → `COVER_VO_ENABLED`) decides whether `buildIntake()` writes those
+six answers at all. The page reads the same flag per request and passes it to the form as `coverVo`,
+which is why `app/startups/authors/intake/page.jsx` is `force-dynamic`: a `process.env` read inside a
+client component is resolved at **build** time, so a prerendered page would show the block while the
+route dropped the answers. Turning the flag off hides the block and omits the fields together.
 
 **Schema changes are deliberate.** The schema is read from the host file at container start, so an
 edit to `intake/schema.json` takes effect on `docker compose up -d web` — no rebuild. The route logs
 `authors-intake-schema-version-mismatch` when the mounted `$id` is not the `SCHEMA_ID` in
-`web/lib/intake-fields.mjs`. The cover-image and voice-over fields (card `t_7487852d`) are **not**
-collected yet: `COVER_VO_ENABLED` is off, with the exact attach points marked `TODO(t_7487852d)` in
-`lib/intake-fields.mjs`, `route.js` and `IntakeForm.jsx`. Do not add an input for a field the
-schema does not declare — `additionalProperties: false` means the submission would be refused and
-the author's answers lost.
+`web/lib/intake-fields.mjs` (currently `intake-starter-v2` / `starter-v2`). Never add an input for a
+field the schema does not declare — `additionalProperties: false` means the submission would be
+refused and the author's answers lost; and never leave a rendered input out of `buildIntake()`, which
+would drop the answer just as quietly.
 
 **The honeypot name is a build gate, not a review note.** It used to be `website`, and `website` is
 the record's own required top-level section — so any body shaped like the record (a migration, an

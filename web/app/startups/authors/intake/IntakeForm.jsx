@@ -241,7 +241,7 @@ function Section({ section, register, children }) {
 
 /* --- the form -------------------------------------------------------------------------------- */
 
-export default function IntakeForm() {
+export default function IntakeForm({ coverVo = false }) {
   const formRef = useRef(null);
   const meterRef = useRef(null);
   const barRef = useRef(null);
@@ -598,14 +598,13 @@ export default function IntakeForm() {
         </Section>
 
         <Section section={SECTIONS[3]} register={register("your-book")}>
-          {/* TODO(t_7487852d): the cover-video card adds two answers to this section —
-              a cover image (retailer URL + permission to use it, "at least 1500 px on the long
-              edge, the file the retailer uses for the paperback or Kindle cover") and the
-              voice-over line with who approved it. They are NOT rendered yet on purpose: the
-              record refuses a field the schema does not know, so a box here would drop the
-              author's answer. Add them under lib/intake-fields.mjs's COVER_VO_ENABLED flag once
-              ops lands the names in intake/schema.json, and state that a small cover is a
-              heads-up for us, not a reason to stop. */}
+          {/* Cover image + voice-over line (schema v2, card t_87bb5c11 wiring t_7487852d's fields).
+              Rendered only when the server passes COVER_VO_ENABLED as `coverVo`: the record is
+              mounted `additionalProperties: false`, so a box whose answer buildIntake() would not
+              write is a box that loses the author's answer. The flag is decided per request on the
+              server (page.jsx is force-dynamic) because a `process.env` read inside a client
+              component is resolved at build time. Every field here is optional by design — a weak
+              cover or an unapproved line is a heads-up for us, never a reason to stop. */}
           <div className={t.note}>
             <p>
               This kit focuses on one book. If you&rsquo;d like a kit for another title, say so under
@@ -696,6 +695,55 @@ export default function IntakeForm() {
             ))}
           </div>
           <Text id="content_warnings" label="Content warnings (violence, abuse, language, etc.)" wide />
+
+          {coverVo ? (
+            <div className={t.panel}>
+              <p className={t.hint}>
+                <strong>Optional: cover image and voice-over line.</strong> Used only if you&rsquo;d
+                like a short cover clip. Leave it blank if you&rsquo;d rather not; the rest of your
+                kit doesn&rsquo;t depend on it.
+              </p>
+              <Text
+                id="cover_file"
+                label="Book cover image: the file name, if you send us the file"
+                hint="At least 1500 px on the long edge: the file the retailer uses for your paperback or Kindle cover. Email the file to support@flashtech.biz and put its name here, for example cover.jpg. If your image is smaller we can still work with it, but a cover clip made from it will look soft, and we'll tell you before we use it."
+              />
+              <Text
+                id="cover_url"
+                label="Link to your book's page (we take the cover from there)"
+                hint="Only if you'd rather not send the file. Full address, starting with https://"
+                type="url"
+                inputMode="url"
+                placeholder="https://"
+                maxLength={500}
+              />
+              <label className={`${t.option} ${t.wide}`}>
+                <input type="checkbox" name="cover_permission" value="on" />
+                <span>
+                  The cover is mine to use, and you may use it in my marketing, including a short
+                  cover clip. If a designer made it, I&rsquo;ve checked that I hold the rights.
+                </span>
+              </label>
+              <Area
+                id="vo_line"
+                label="Voice-over line for a short cover clip"
+                hint="Two short sentences that make someone want to open the book without giving the story away, then the title in italics, then your name. About 10–25 words. Shape: “Two sentences that tease the story. Your Title — Your Name.” The clip reads your line aloud and puts no text on screen, so it has to work heard, not read."
+                rows={3}
+                maxLength={400}
+              />
+              <Text
+                id="vo_approved_by"
+                label="Who approved that line?"
+                hint="You, or whoever speaks for you. We don't record a clip from a line you haven't approved word for word."
+              />
+              <Text
+                id="vo_approved_date"
+                label="When was it approved?"
+                hint="If the wording changes later, the new version needs approving too."
+                type="date"
+              />
+            </div>
+          ) : null}
         </Section>
 
         <Section section={SECTIONS[4]} register={register("your-readers")}>

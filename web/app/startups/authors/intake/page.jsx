@@ -2,6 +2,7 @@ import "../../../globals.css";
 import s from "../authors.module.css";
 import t from "./intake.module.css";
 import IntakeForm from "./IntakeForm";
+import { COVER_VO_ENABLED, INTAKE_VERSION } from "@/lib/intake-fields.mjs";
 
 /**
  * The Starter Kit questionnaire: one author at a time, sent as a link by the owner.
@@ -14,7 +15,12 @@ import IntakeForm from "./IntakeForm";
  *   - `robots: noindex` here, and /startups/authors/intake is absent from lib/site.mjs's
  *     PUBLIC_ROUTES, so /sitemap.xml cannot advertise it (scripts/check-store.mjs pins that list).
  *   - nothing on the site links to it; the owner sends the URL to one author.
+ *
+ * Rendered per request, not at build time, because the form's optional cover/voice-over block is
+ * switched by INTAKE_COVER_VO — a runtime env var the route reads per request too. A statically
+ * prerendered page would freeze the build machine's value into the HTML and the two could disagree.
  */
+export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "The Starter Kit questionnaire — The Author's Candle",
@@ -61,7 +67,7 @@ export default function IntakePage() {
           <div className={s.wrap}>
             <div className={t.introGrid}>
               <div>
-                <p className={s.label}>Starter Kit · starter-v1</p>
+                <p className={s.label}>Starter Kit · {INTAKE_VERSION}</p>
                 <h1 className={t.h1}>The questionnaire behind your marketing kit.</h1>
                 <p className={t.lede}>
                   Everything in your kit — bios, book descriptions, social posts, the podcast pitch and the
@@ -85,7 +91,7 @@ export default function IntakePage() {
           </div>
         </section>
 
-        <IntakeForm />
+        <IntakeForm coverVo={COVER_VO_ENABLED} />
 
         <section className={t.after}>
           <div className={s.wrap}>

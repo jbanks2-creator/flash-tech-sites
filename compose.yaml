@@ -25,9 +25,12 @@ services:
       # pipeline's own schema, mounted read-only below, so a stored intake runs through
       # scripts/validate_intake.py without editing.
       INTAKE_SCHEMA: /app/schema/intake-starter-v1.json
-      # Cover image + approved voice-over line (card t_7487852d) stay OFF until that card lands
-      # their fields in intake/schema.json. See COVER_VO_ENABLED in web/lib/intake-fields.mjs.
-      INTAKE_COVER_VO: ${INTAKE_COVER_VO:-off}
+      # Cover image + approved voice-over line (schema v2: fields landed by t_7487852d, wired by
+      # t_87bb5c11). ON: the record declares all six fields, the form renders them, buildIntake()
+      # writes what the author gives. Read per request by both the page and the route, so turning it
+      # off while the form still showed the block would drop the answers - the two move together.
+      # See COVER_VO_ENABLED in web/lib/intake-fields.mjs.
+      INTAKE_COVER_VO: ${INTAKE_COVER_VO:-on}
     volumes:
       - /home/Jerry/businesses/author-marketing/inquiries:/data/author-inquiries
       - /home/Jerry/businesses/author-marketing/intake/schema.json:/app/schema/intake-starter-v1.json:ro

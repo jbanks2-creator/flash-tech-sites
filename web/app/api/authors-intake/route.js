@@ -148,11 +148,11 @@ export async function POST(request) {
 
   // Only the known questions are read; anything else in the body is ignored, never stored.
   //
-  // TODO(t_7487852d): the cover-video card adds a cover image (retailer URL + permission) and the
-  // approved voice-over line to intake/schema.json. The attach point for both is here — they are
-  // read off the body by adding their names to LIMITS in lib/intake-fields.mjs, which is the one
-  // list this loop and the browser form both use — and they are written into the record in
-  // buildIntake() (marked TODO there). Names must be copied from the landed schema verbatim.
+  // LIMITS is the one list this loop and the browser form both use, so a new answer is read here by
+  // being added there. The cover image and voice-over line (schema v2, card t_87bb5c11) are six
+  // entries in it: cover_file, cover_url, cover_permission, vo_line, vo_approved_by,
+  // vo_approved_date. buildIntake() writes them into `book` only when COVER_VO_ENABLED is on,
+  // because the mounted record refuses a property it does not declare.
   const raw = {};
   for (const key of Object.keys(LIMITS)) {
     const value = body[key];

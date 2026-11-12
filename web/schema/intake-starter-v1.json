@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "intake-starter-v1",
+  "$id": "intake-starter-v2",
   "title": "The Author's Candle Starter kit intake record",
-  "description": "One record per job. Required fields block production. See intake/questionnaire-spec.md for field meanings.",
+  "description": "One record per job. Required fields block production. See intake/questionnaire-spec.md for field meanings. v2 adds the cover image and the approved voice-over line used by the cover clip; both are optional and a weak cover or a draft line is a needs-human flag, never a refusal.",
   "type": "object",
   "required": ["meta", "personal", "author", "book", "audience", "website", "social", "marketing", "consent"],
   "additionalProperties": false,
@@ -38,7 +38,10 @@
       "properties": {
         "job_id": {"type": "string", "pattern": "^[a-z0-9-]+$"},
         "package": {"const": "starter"},
-        "intake_version": {"const": "starter-v1"},
+        "intake_version": {
+          "enum": ["starter-v1", "starter-v2"],
+          "description": "Which questionnaire version captured this record. starter-v2 asks for the cover image and the voice-over line; starter-v1 records stay valid and are treated as 'we never asked'."
+        },
         "submitted_date": {"type": "string", "format": "date"},
         "is_sample": {"type": "boolean"},
         "unconfirmed_fields": {"type": "array", "items": {"type": "string"}, "description": "Dotted paths pre-filled from public sources and not yet confirmed by the author. Production treats these as missing."},
@@ -122,7 +125,33 @@
           }
         },
         "content_warnings": {"type": "string"},
-        "cover_file": {"type": "string"}
+        "cover_file": {
+          "type": "string",
+          "description": "Cover image supplied with the job: the file name inside the job folder (for example cover.jpg or assets/cover.jpg). Optional; cover_url is enough when the author only has a retailer link. Ask for at least 1500 px on the long edge - the file the retailer uses for the paperback or Kindle cover. A smaller file is a needs-human flag, never a refusal."
+        },
+        "cover_url": {
+          "$ref": "#/$defs/url",
+          "description": "Where the cover is published: the retailer listing or the author's own page. Used when no file is supplied, and only with cover_permission true."
+        },
+        "cover_permission": {
+          "type": "boolean",
+          "description": "The author owns the cover or has the right to have it used in their own marketing, including a short cover clip. The cover is not used until this is true; a false or missing value is a needs-human flag, not a validation failure."
+        },
+        "vo_line": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 400,
+          "description": "The one line spoken over the cover in the clip: two short sentences that tease without spoiling the story, then the title, then the author name. 10-25 words. The renderer copies it verbatim and never writes text of its own, so it must be approved word for word."
+        },
+        "vo_approved_by": {
+          "$ref": "#/$defs/nonEmpty",
+          "description": "Who approved the exact wording of vo_line - the author, or the owner acting for them. Without this and vo_approved_date the line is a draft and no clip may be rendered for the customer."
+        },
+        "vo_approved_date": {
+          "type": "string",
+          "format": "date",
+          "description": "Date the wording of vo_line was approved. Recorded with the approval flag so what the buyer hears is auditable."
+        }
       },
       "allOf": [
         {"if": {"properties": {"book_type": {"const": "fiction"}}}, "then": {"required": ["plot_summary"], "properties": {"plot_summary": {"pattern": "\\[MIDPOINT\\]"}}}},
