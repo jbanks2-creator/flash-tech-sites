@@ -1,0 +1,221 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "intake-starter-v1",
+  "title": "The Author's Candle Starter kit intake record",
+  "description": "One record per job. Required fields block production. See intake/questionnaire-spec.md for field meanings.",
+  "type": "object",
+  "required": ["meta", "personal", "author", "book", "audience", "website", "social", "marketing", "consent"],
+  "additionalProperties": false,
+  "$defs": {
+    "nonEmpty": {"type": "string", "minLength": 1},
+    "url": {"type": "string", "pattern": "^https?://\\S+$"},
+    "sourcedFact": {
+      "type": "object",
+      "required": ["text"],
+      "additionalProperties": false,
+      "properties": {
+        "text": {"$ref": "#/$defs/nonEmpty"},
+        "link": {"$ref": "#/$defs/url"},
+        "year": {"type": "integer", "minimum": 1900, "maximum": 2100}
+      }
+    },
+    "writingSample": {
+      "type": "object",
+      "required": ["title", "text"],
+      "additionalProperties": false,
+      "properties": {
+        "title": {"$ref": "#/$defs/nonEmpty"},
+        "kind": {"type": "string", "description": "e.g. blog post, newsletter, journal, excerpt from the book"},
+        "text": {"type": "string", "minLength": 400, "description": "At least 80 words each and 600 words in total across all samples; enforced by validate_intake.py"}
+      }
+    }
+  },
+  "properties": {
+    "meta": {
+      "type": "object",
+      "required": ["job_id", "package", "intake_version", "submitted_date", "is_sample"],
+      "additionalProperties": false,
+      "properties": {
+        "job_id": {"type": "string", "pattern": "^[a-z0-9-]+$"},
+        "package": {"const": "starter"},
+        "intake_version": {"const": "starter-v1"},
+        "submitted_date": {"type": "string", "format": "date"},
+        "is_sample": {"type": "boolean"},
+        "unconfirmed_fields": {"type": "array", "items": {"type": "string"}, "description": "Dotted paths pre-filled from public sources and not yet confirmed by the author. Production treats these as missing."},
+        "notes": {"type": "string"}
+      }
+    },
+    "personal": {
+      "type": "object",
+      "required": ["legal_name", "public_name", "email", "country_timezone", "pronouns"],
+      "additionalProperties": false,
+      "properties": {
+        "legal_name": {"$ref": "#/$defs/nonEmpty"},
+        "public_name": {"$ref": "#/$defs/nonEmpty", "description": "Name exactly as it should appear on all assets"},
+        "email": {"type": "string", "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"},
+        "country_timezone": {"$ref": "#/$defs/nonEmpty"},
+        "pronouns": {"$ref": "#/$defs/nonEmpty", "description": "Used for third-person copy"},
+        "location_publishable": {"type": "string", "description": "City/region the author is happy to have published; blank = do not mention location"},
+        "phone": {"type": "string"},
+        "assistant_contact": {"type": "string"}
+      }
+    },
+    "author": {
+      "type": "object",
+      "required": ["genre_or_field", "one_sentence_identity", "credentials", "current_bio", "writing_samples"],
+      "additionalProperties": false,
+      "properties": {
+        "genre_or_field": {"$ref": "#/$defs/nonEmpty"},
+        "one_sentence_identity": {"$ref": "#/$defs/nonEmpty"},
+        "credentials": {"type": "array", "minItems": 1, "maxItems": 3, "items": {"$ref": "#/$defs/nonEmpty"}, "description": "Top credentials OR life/work experiences relevant to the writing. Fiction authors may list experiences."},
+        "current_bio": {"type": "string", "description": "Paste any existing bio; empty string if none"},
+        "writing_samples": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/writingSample"}},
+        "origin_story": {"type": "string"},
+        "awards_media": {"type": "array", "items": {"$ref": "#/$defs/sourcedFact"}},
+        "education": {"type": "string"},
+        "personal_details_publishable": {"type": "string"},
+        "do_not_mention": {"type": "array", "items": {"$ref": "#/$defs/nonEmpty"}},
+        "other_titles": {"type": "array", "items": {"$ref": "#/$defs/nonEmpty"}},
+        "protected_spellings": {"type": "array", "items": {"$ref": "#/$defs/nonEmpty"}, "description": "Exact spellings never to be corrected. The pipeline also adds names and titles automatically."},
+        "headshot_file": {"type": "string", "description": "Not needed while the one-sheet is text only"}
+      }
+    },
+    "book": {
+      "type": "object",
+      "required": ["title", "subtitle", "book_type", "genre_category", "status", "publication_date", "premise", "themes", "platform", "distribution"],
+      "additionalProperties": false,
+      "properties": {
+        "title": {"$ref": "#/$defs/nonEmpty"},
+        "subtitle": {"type": "string", "description": "Empty string if the book has no subtitle"},
+        "series_name": {"type": "string"},
+        "series_number": {"type": "integer", "minimum": 1},
+        "sequels_confirmed": {"type": "string", "description": "What the author allows us to say about future books; blank = say nothing"},
+        "book_type": {"enum": ["fiction", "nonfiction"]},
+        "genre_category": {"$ref": "#/$defs/nonEmpty"},
+        "status": {"enum": ["drafting", "pre-launch", "published"]},
+        "publication_date": {"type": "string", "format": "date"},
+        "premise": {"$ref": "#/$defs/nonEmpty", "description": "One paragraph: premise (fiction) or promise (nonfiction)"},
+        "themes": {"type": "array", "minItems": 3, "maxItems": 5, "items": {"$ref": "#/$defs/nonEmpty"}},
+        "plot_summary": {"type": "string", "description": "Fiction: full summary with the marker [MIDPOINT] where the middle of the story falls"},
+        "reveal_limit": {"type": "string", "description": "Fiction: anything that must never be revealed, even before the midpoint"},
+        "nonfiction_summary": {"type": "string", "description": "Nonfiction: chapter list or detailed summary; all promised benefits must come from here"},
+        "book_tone": {"type": "string"},
+        "platform": {"type": "array", "minItems": 1, "items": {"enum": ["Amazon KDP", "IngramSpark", "Draft2Digital", "Other"]}},
+        "distribution": {"enum": ["exclusive", "wide"]},
+        "isbn": {"type": "string"},
+        "page_count": {"type": "integer", "minimum": 1},
+        "formats": {"type": "array", "items": {"type": "string"}},
+        "price": {"type": "string"},
+        "retailer_links": {"type": "array", "items": {"$ref": "#/$defs/url"}},
+        "comparable_titles": {"type": "array", "items": {"$ref": "#/$defs/nonEmpty"}},
+        "reviews_endorsements": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["quote", "source", "permission_confirmed"],
+            "additionalProperties": false,
+            "properties": {
+              "quote": {"$ref": "#/$defs/nonEmpty"},
+              "source": {"$ref": "#/$defs/nonEmpty"},
+              "permission_confirmed": {"type": "boolean"}
+            }
+          }
+        },
+        "content_warnings": {"type": "string"},
+        "cover_file": {"type": "string"}
+      },
+      "allOf": [
+        {"if": {"properties": {"book_type": {"const": "fiction"}}}, "then": {"required": ["plot_summary"], "properties": {"plot_summary": {"pattern": "\\[MIDPOINT\\]"}}}},
+        {"if": {"properties": {"book_type": {"const": "nonfiction"}}}, "then": {"required": ["nonfiction_summary"], "properties": {"nonfiction_summary": {"minLength": 1}}}}
+      ]
+    },
+    "audience": {
+      "type": "object",
+      "required": ["ideal_reader", "problem_or_desire", "where_they_spend_time"],
+      "additionalProperties": false,
+      "properties": {
+        "ideal_reader": {"$ref": "#/$defs/nonEmpty"},
+        "problem_or_desire": {"$ref": "#/$defs/nonEmpty"},
+        "where_they_spend_time": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/nonEmpty"}},
+        "demographics": {"type": "string"},
+        "reader_language": {"type": "string"},
+        "authors_shows_followed": {"type": "array", "items": {"type": "string"}},
+        "email_list_size": {"type": "integer", "minimum": 0}
+      }
+    },
+    "website": {
+      "type": "object",
+      "required": ["has_website"],
+      "additionalProperties": false,
+      "properties": {
+        "has_website": {"type": "boolean"},
+        "url": {"$ref": "#/$defs/url"},
+        "platform": {"type": "string"},
+        "lead_magnet": {"type": "string"}
+      },
+      "if": {"properties": {"has_website": {"const": true}}},
+      "then": {"required": ["url"]}
+    },
+    "social": {
+      "type": "object",
+      "required": ["active_platforms"],
+      "additionalProperties": false,
+      "properties": {
+        "active_platforms": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["platform", "handle"],
+            "additionalProperties": false,
+            "properties": {
+              "platform": {"enum": ["Facebook", "Instagram", "LinkedIn", "X", "TikTok", "Threads", "Bluesky", "YouTube", "Other"]},
+              "handle": {"$ref": "#/$defs/nonEmpty"},
+              "followers": {"type": "integer", "minimum": 0}
+            }
+          }
+        },
+        "post_platforms": {"type": "array", "items": {"type": "string"}, "description": "Platforms the 10 posts should target; defaults to active_platforms"},
+        "posting_frequency": {"type": "string"},
+        "top_posts": {"type": "array", "items": {"type": "string"}},
+        "refused_platforms": {"type": "array", "items": {"type": "string"}},
+        "tone_preferences": {"type": "string"}
+      }
+    },
+    "marketing": {
+      "type": "object",
+      "required": ["primary_goal", "hours_per_week", "budget_band", "talking_points", "call_to_action"],
+      "additionalProperties": false,
+      "properties": {
+        "primary_goal": {"enum": ["sales", "reviews", "list growth", "podcast guesting", "speaking", "clients"]},
+        "secondary_goals": {"type": "array", "items": {"type": "string"}},
+        "hours_per_week": {"type": "number", "minimum": 0},
+        "budget_band": {"enum": ["$0", "under $100/mo", "$100-500/mo", "$500-2,000/mo", "over $2,000/mo"]},
+        "talking_points": {"type": "array", "minItems": 3, "maxItems": 5, "items": {"$ref": "#/$defs/nonEmpty"}, "description": "Topics the author can talk about on a podcast; feeds the pitch"},
+        "call_to_action": {
+          "type": "object",
+          "required": ["action", "link"],
+          "additionalProperties": false,
+          "properties": {
+            "action": {"$ref": "#/$defs/nonEmpty", "description": "e.g. Buy the book, Join my newsletter"},
+            "link": {"$ref": "#/$defs/url"}
+          }
+        },
+        "tried_before": {"type": "string"},
+        "podcasts_wanted": {"type": "array", "items": {"type": "string"}},
+        "peers_admired": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "consent": {
+      "type": "object",
+      "required": ["facts_accurate", "ai_disclosure_understood", "image_rights"],
+      "additionalProperties": false,
+      "properties": {
+        "facts_accurate": {"const": true},
+        "ai_disclosure_understood": {"const": true},
+        "image_rights": {"type": "boolean"},
+        "consent_date": {"type": "string", "format": "date"}
+      }
+    }
+  }
+}

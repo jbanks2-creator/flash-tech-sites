@@ -12,9 +12,10 @@ import {
   SCHEMA_ID,
   buildIntake,
   checkAnswers,
-  clean,
   describeSchemaErrors,
+  isTrapped,
   makeJobId,
+  schemaPropertyNames,
 } from "@/lib/intake-fields.mjs";
 
 /**
@@ -52,11 +53,36 @@ function getValidator() {
         console.warn(JSON.stringify({
           at: new Date().toISOString(),
           kind: "authors-intake-schema-version-mismatch",
+          outcome: "warn",
           expected: SCHEMA_ID,
           mounted: schema.$id,
           cover_vo_fields: COVER_VO_ENABLED,
         }));
       }
+
+      // Last line of defence for the honeypot collision (see HONEYPOT in lib/intake-fields.mjs).
+      // The build gate and the unit test both prove the trap name is not in the record's
+      // namespace; if a schema is mounted that breaks that rule anyway, the trap would match a
+      // real section and quietly discard every submission shaped like the record. Refuse instead:
+      // a 500 is visible to the author and to us, a silent `{ok:true}` is not.
+      const collision = schemaPropertyNames(schema).has(HONEYPOT);
+      if (collision || Object.hasOwn(LIMITS, HONEYPOT)) {
+        console.error(JSON.stringify({
+          at: new Date().toISOString(),
+          kind: "authors-intake-honeypot-collision",
+          outcome: "refused",
+          severity: "critical",
+          trap: HONEYPOT,
+          reason: collision
+            ? "the honeypot name is a property name in the mounted schema"
+            : "the honeypot name is one of the form's own answer fields",
+          note: "Every submission is being refused on purpose. Rename the trap or the schema field before serving traffic.",
+        }));
+        const error = new Error(`honeypot "${HONEYPOT}" collides with the intake record`);
+        error.code = "HONEYPOT_COLLISION";
+        throw error;
+      }
+
       const ajv = new Ajv2020({ allErrors: true, strict: false });
       addFormats(ajv);
       return ajv.compile(schema);
@@ -99,10 +125,24 @@ export async function POST(request) {
     return badRequest("The questionnaire could not be read. Please try again, or email support@flashtech.biz.");
   }
 
-  // Honeypot: a bot fills every input it finds, a person never sees this one. Accept silently and
-  // store nothing, so a bot learns nothing.
-  if (clean(body[HONEYPOT])) {
-    console.log(JSON.stringify({ at: new Date().toISOString(), kind: "authors-intake-honeypot" }));
+  // Honeypot: a bot fills every input it finds, a person never sees this one. The client always
+  // gets a plain `200 {ok:true}` — telling a bot it was caught only helps it adapt — but the server
+  // log must never be able to confuse this with a stored submission. Hence `console.warn` (not
+  // `log`), `outcome:"discarded"` and `stored:false` on the line, which no other outcome carries.
+  //
+  // Deliberately no IP, user-agent or header in this line: the trap exists to keep bot traffic out
+  // of the inbox, not to build a visitor log.
+  if (isTrapped(body)) {
+    console.warn(JSON.stringify({
+      at: new Date().toISOString(),
+      kind: "authors-intake-honeypot",
+      outcome: "discarded",
+      severity: "warn",
+      stored: false,
+      job_id: null,
+      trap: HONEYPOT,
+      note: "trap field was filled: nothing written to the inbox; the client was told ok:true on purpose",
+    }));
     return NextResponse.json({ ok: true });
   }
 
@@ -121,7 +161,7 @@ export async function POST(request) {
 
   const errors = checkAnswers(raw);
   if (errors.length) {
-    console.log(JSON.stringify({ at: new Date().toISOString(), kind: "authors-intake-refused", errors: errors.length }));
+    console.log(JSON.stringify({ at: new Date().toISOString(), kind: "authors-intake-refused", outcome: "refused", stored: false, errors: errors.length }));
     return badRequest(`Please check ${errors.length === 1 ? "one answer" : `${errors.length} answers`} below. Nothing has been lost.`, errors);
   }
 
@@ -130,7 +170,7 @@ export async function POST(request) {
   if (!inbox) {
     // Dev builds have no inbox mounted. Refuse rather than pretend: a half-hour of an author's
     // answers must never disappear into a log line.
-    console.error(JSON.stringify({ at: new Date().toISOString(), kind: "authors-intake-unconfigured" }));
+    console.error(JSON.stringify({ at: new Date().toISOString(), kind: "authors-intake-unconfigured", outcome: "refused", stored: false }));
     return serverError("The questionnaire is not connected to the office inbox yet. Please email support@flashtech.biz and we'll take it from there.");
   }
 
@@ -138,7 +178,16 @@ export async function POST(request) {
   try {
     validate = await getValidator();
   } catch (error) {
-    console.error(JSON.stringify({ at: new Date().toISOString(), kind: "authors-intake-schema-unreadable", error: String(error) }));
+    // A collision is not a generic failure: it is the exact bug this endpoint must never have
+    // again, so it gets its own kind and the loudest level. getValidator already logged the detail.
+    const collision = error && error.code === "HONEYPOT_COLLISION";
+    console.error(JSON.stringify({
+      at: new Date().toISOString(),
+      kind: collision ? "authors-intake-honeypot-collision" : "authors-intake-schema-unreadable",
+      outcome: "refused",
+      stored: false,
+      error: String(error),
+    }));
     return serverError("Something went wrong on our side. Please try again in a few minutes, or email support@flashtech.biz.");
   }
 
@@ -146,7 +195,7 @@ export async function POST(request) {
   try {
     await mkdir(directory, { recursive: true });
   } catch (error) {
-    console.error(JSON.stringify({ at: new Date().toISOString(), kind: "authors-intake-mkdir-failed", error: String(error) }));
+    console.error(JSON.stringify({ at: new Date().toISOString(), kind: "authors-intake-mkdir-failed", outcome: "failed", stored: false, error: String(error) }));
     return serverError("Something went wrong on our side. Please try again in a few minutes, or email support@flashtech.biz.");
   }
 
@@ -157,7 +206,7 @@ export async function POST(request) {
 
     if (!validate(intake)) {
       const problems = describeSchemaErrors(validate.errors || []);
-      console.error(JSON.stringify({ at: submittedDate, kind: "authors-intake-schema-refused", errors: problems.map((p) => `${p.label}: ${p.message}`) }));
+      console.error(JSON.stringify({ at: submittedDate, kind: "authors-intake-schema-refused", outcome: "refused", stored: false, errors: problems.map((p) => `${p.label}: ${p.message}`) }));
       return badRequest("Some answers don't fit the record we have to keep. Nothing has been lost; please check the fields below.", problems);
     }
 
@@ -165,14 +214,14 @@ export async function POST(request) {
       await writeFile(join(directory, `${jobId}.json`), `${JSON.stringify(intake, null, 2)}\n`, { flag: "wx" });
     } catch (error) {
       if (error && error.code === "EEXIST") continue; // a suffix collision: try another job_id
-      console.error(JSON.stringify({ at: new Date().toISOString(), kind: "authors-intake-store-failed", error: String(error) }));
+      console.error(JSON.stringify({ at: new Date().toISOString(), kind: "authors-intake-store-failed", outcome: "failed", stored: false, error: String(error) }));
       return serverError("We couldn't save your answers. Please try again in a few minutes, or email support@flashtech.biz.");
     }
 
-    console.log(JSON.stringify({ at: new Date().toISOString(), kind: "authors-intake", job_id: jobId, stored: true }));
+    console.log(JSON.stringify({ at: new Date().toISOString(), kind: "authors-intake", outcome: "stored", job_id: jobId, stored: true }));
     return NextResponse.json({ ok: true, job_id: jobId, submitted_date: submittedDate });
   }
 
-  console.error(JSON.stringify({ at: new Date().toISOString(), kind: "authors-intake-id-collision" }));
+  console.error(JSON.stringify({ at: new Date().toISOString(), kind: "authors-intake-id-collision", outcome: "failed", stored: false }));
   return serverError("Something went wrong on our side. Please try again in a few minutes, or email support@flashtech.biz.");
 }

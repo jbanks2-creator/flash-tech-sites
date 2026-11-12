@@ -20,8 +20,23 @@
 export const SHORT = 200;
 /** Longest free-text answer (prose boxes, one per answer). */
 export const LONG = 4000;
-/** Honeypot input name. Bots fill a field called "website"; the real site field is website_url. */
-export const HONEYPOT = "website";
+
+/**
+ * Honeypot input name. A bot fills every input it finds; a person never sees this one, because it
+ * is visually hidden, off the tab order and labelled "Leave this empty".
+ *
+ * THE RULE THAT MATTERS: this name must never be a property name anywhere in
+ * intake/schema.json. It used to be "website", which the schema uses as a REQUIRED TOP-LEVEL
+ * section — so any body shaped like the record itself (a migration, an admin re-post, a client
+ * built from the schema) looked like a filled trap and was answered `{ok:true}` and thrown away,
+ * with no file written and nothing in the response to say so. The `hp_` prefix keeps it out of the
+ * record's namespace, and the rule is enforced by test, not by review:
+ *
+ *   web/lib/intake-fields.test.mjs            `npm test` — fails on a collision
+ *   web/scripts/check-intake-honeypot.mjs     `npm run build` — fails the image build
+ *   route.js getValidator()                   refuses every submission loudly if it ever slips
+ **/
+export const HONEYPOT = "hp_website";
 /** A single submission cannot exceed this, so nobody can fill the disk with one request. */
 export const MAX_BODY_BYTES = 512 * 1024;
 
@@ -195,6 +210,48 @@ export function clean(value) {
     .replace(/\r\n?/g, "\n")
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
     .trim();
+}
+
+/**
+ * Did a submission fill the trap? The whole honeypot decision, in one place so a test can prove
+ * the incident cannot come back: a body shaped like the record (`{website: {has_website: false}}`)
+ * must not be trapped, and a body with the trap filled must be.
+ *
+ * Objects and arrays count as filled: a bot that posts `hp_website: {}` is still a bot, and no
+ * honest client has a reason to send the trap at all.
+ */
+export function isTrapped(body) {
+  if (!body || typeof body !== "object") return false;
+  const value = body[HONEYPOT];
+  if (value == null) return false;
+  if (typeof value === "object") return true;
+  return clean(value) !== "";
+}
+
+/**
+ * Every property name a JSON Schema declares, at any depth (through `properties`, `items`,
+ * `additionalProperties`, `allOf`, `$defs` — everywhere).
+ *
+ * One implementation, three callers: the build gate, the unit test and the route's startup
+ * assertion all use it to prove the honeypot name is not in the record's namespace.
+ */
+export function schemaPropertyNames(node, names = new Set()) {
+  if (Array.isArray(node)) {
+    for (const item of node) schemaPropertyNames(item, names);
+    return names;
+  }
+  if (!node || typeof node !== "object") return names;
+  const properties = node.properties;
+  if (properties && typeof properties === "object" && !Array.isArray(properties)) {
+    for (const [key, subschema] of Object.entries(properties)) {
+      names.add(key);
+      schemaPropertyNames(subschema, names);
+    }
+  }
+  for (const [key, value] of Object.entries(node)) {
+    if (key !== "properties") schemaPropertyNames(value, names);
+  }
+  return names;
 }
 
 const checked = (value) => ["on", "true", "yes", "1"].includes(clean(value).toLowerCase());

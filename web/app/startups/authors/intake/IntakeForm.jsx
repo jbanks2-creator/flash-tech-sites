@@ -465,7 +465,7 @@ export default function IntakeForm() {
             interrupting with one bubble at a time: the server answers with every missing answer
             named at once, and nothing the author typed is ever cleared. */}
         <div className={t.trap} aria-hidden="true">
-          <label htmlFor={HONEYPOT}>Leave this field empty</label>
+          <label htmlFor={HONEYPOT}>Leave this empty</label>
           <input id={HONEYPOT} name={HONEYPOT} tabIndex={-1} autoComplete="off" />
         </div>
 

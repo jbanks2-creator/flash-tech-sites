@@ -81,8 +81,18 @@ origin `robots.txt`, it only substitutes one when the origin has none. Two conse
    to the file can take up to that long to appear at `https://flashtech.biz/robots.txt`. Purge the
    URL in the dashboard when that matters.
 
-Cloudflare's bot protection answers `python-urllib`'s default User-Agent with 403 on this zone;
-use `curl` (or a browser UA) when verifying from a script.
+Cloudflare's bot protection answers the literal `python-urllib` User-Agent with **403 and a
+`text/plain` body reading `error code: 1010`** — that is Cloudflare, not this app, and it is not
+JSON, so a script that only parses JSON will look like it "got nothing". `curl`'s own default UA is
+allowed today, but pin a browser-like one in anything you keep:
+
+```bash
+UA='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+curl -sS -A "$UA" https://flashtech.biz/startups/authors/intake -o /dev/null -w '%{http_code}\n'
+```
+
+Measured 2026-11-12: `-A 'Python-urllib/3.11'` → `403 error code: 1010`; empty UA → reaches the
+app; `curl/8.x` → reaches the app.
 
 ## The author intake form: /startups/authors/intake
 
@@ -94,7 +104,10 @@ owner — **not** a marketing page:
   route is deliberately absent from `PUBLIC_ROUTES`, so `/sitemap.xml` cannot advertise it.
 - `web/app/api/authors-intake/route.js` — `POST` handler. Reads only the answer fields listed in
   `web/lib/intake-fields.mjs` (`LIMITS`); **no IP, user-agent, referrer or headers are stored or
-  logged**. Honeypot input is named `website`; a bot that fills it gets a 200 and nothing is written.
+  logged**. The honeypot input is named `hp_website` (visually hidden, off the tab order, labelled
+  "Leave this empty"); a bot that fills it gets `200 {"ok":true}` and nothing is written, and the
+  server log records `kind:"authors-intake-honeypot", outcome:"discarded", stored:false` — never
+  confusable with a stored submission (`outcome:"stored", stored:true, job_id:…`).
   Per-field caps: 200 chars on short answers, 4,000 on prose, 512 KB per request. There is no rate
   limit (by design) — the caps are what stop the disk filling.
 - Each accepted submission is validated with AJV against
@@ -115,11 +128,57 @@ collected yet: `COVER_VO_ENABLED` is off, with the exact attach points marked `T
 schema does not declare — `additionalProperties: false` means the submission would be refused and
 the author's answers lost.
 
-Verify it (Cloudflare answers `python-urllib`'s default UA with 403, so use curl or a browser UA):
+**The honeypot name is a build gate, not a review note.** It used to be `website`, and `website` is
+the record's own required top-level section — so any body shaped like the record (a migration, an
+admin re-post, a client generated from the schema) tripped the trap and was answered
+`200 {"ok":true}` and discarded silently (found in production 2026-11-12, card `t_ce133486`). Three
+things now prevent it, and none of them is a person remembering:
+
+1. `web/lib/intake-fields.test.mjs` — `npm test`. Fails when the trap name is a property name
+   anywhere in the schema, and re-tests the incident body (`{website:{has_website:false}}`) as a
+   named regression.
+2. `web/scripts/check-intake-honeypot.mjs` — runs from `npm run build` (`prebuild`), so a colliding
+   image cannot be built. It reads the copy vendored at `web/schema/intake-starter-v1.json`, because
+   `web/` is the Docker build context and this host has no buildx (a Dockerfile cannot mount
+   `~/businesses`). Refresh it with `node web/scripts/vendor-intake-schema.mjs` whenever the schema
+   changes; `scripts/deploy-intake.sh` re-runs the gate against the authoritative schema with
+   `--require-vendored-match` and aborts if the two files differ, so the in-image check can never be
+   checking a stale copy.
+3. `route.js` `getValidator()` — refuses every submission with a 500 and a
+   `authors-intake-honeypot-collision` error line if a mounted schema ever collides again. Loud and
+   broken beats silent and empty.
+
+Deploy with `bash scripts/deploy-intake.sh`: it runs the tests, the gate, the build and `up -d web`
+in that order, and stops before building if either check fails.
 
 ```bash
 curl -s -o /dev/null -w '%{http_code}\n' https://flashtech.biz/startups/authors/intake   # 200
 curl -s https://flashtech.biz/sitemap.xml | grep -c intake                               # 0
+```
+
+Prove both POST paths (a browser-like UA is required — see the Cloudflare note above; the second
+command must answer `4xx` naming the missing field and write no file):
+
+```bash
+UA='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+INBOX=~/businesses/author-marketing/inquiries/intake
+
+# valid: expect 200 with a job_id, and exactly one new file in $INBOX
+curl -sS -X POST https://flashtech.biz/api/authors-intake -H 'content-type: application/json' \
+     -A "$UA" --data-binary @payload.json
+
+# invalid: drop one required answer; expect 400 naming it, and no new file
+# (checkAnswers refuses before anything is written)
+
+# the trap: expect 200 {"ok":true}, NO job_id, no file, and a `outcome:"discarded"` line in
+#            `docker logs flash-tech-web`
+curl -sS -X POST https://flashtech.biz/api/authors-intake -H 'content-type: application/json' \
+     -A "$UA" -d '{"hp_website":"http://spam.example"}'
+
+# the incident body: a record-shaped submission must no longer be swallowed — expect 400 naming
+# the missing flat answers, never a bare 200
+curl -sS -X POST https://flashtech.biz/api/authors-intake -H 'content-type: application/json' \
+     -A "$UA" -d '{"website":{"has_website":false}}'
 ```
 
 **Measured at the edge (2026-11-12):** the zone's email obfuscation rewrites the `mailto:` links in
