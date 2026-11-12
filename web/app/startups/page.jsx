@@ -1,3 +1,5 @@
+import "../globals.css";
+
 /* Flash Tech → Startups: index of ventures that run on the Flash Tech platform but carry their own brand. */
 export const metadata = {
   title: "Startups | Flash Tech",
