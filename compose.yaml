@@ -19,6 +19,10 @@ services:
       # Read per request by /apps/taskapp/buy, so a checkout link can be swapped without
       # rebuilding the image. Never printed in the page.
       LEMONSQUEEZY_CHECKOUT_URL: ${LEMONSQUEEZY_CHECKOUT_URL:-}
+      # The Author's Candle applications (/api/authors-apply) are written here, one JSON file each.
+      AUTHORS_INBOX: /data/author-inquiries
+    volumes:
+      - /home/Jerry/businesses/author-marketing/inquiries:/data/author-inquiries
     networks: [flash-tech_net]
 
 networks:

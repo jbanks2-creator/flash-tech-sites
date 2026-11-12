@@ -157,6 +157,7 @@ export default function Page() {
               <h4>Flash Tech</h4>
               <p>IT support, cloud, phone systems and AI for small business.</p>
               <p>Sherman · Denison · Grayson County, Texas</p>
+              <p><a href="/startups">Startups</a></p>
             </div>
             <div>
               <h4>Services</h4>
