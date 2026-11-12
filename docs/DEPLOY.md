@@ -122,6 +122,13 @@ curl -s -o /dev/null -w '%{http_code}\n' https://flashtech.biz/startups/authors/
 curl -s https://flashtech.biz/sitemap.xml | grep -c intake                               # 0
 ```
 
+**Measured at the edge (2026-11-12):** the zone's email obfuscation rewrites the `mailto:` links in
+this page's HTML to `/cdn-cgi/l/email-protection` with a `[email protected]` placeholder, and the
+edge's own script decodes them in the browser (a visitor sees `support@flashtech.biz` and a working
+link; a no-JS reader sees `[email protected]`). That is a zone setting, not something this repo
+controls — don't "fix" it by changing the copy, and don't read the placeholder in `curl` output as a
+broken link.
+
 ## TaskApp storefront
 
 `/apps/taskapp` is documented separately in [`STORE-DEPLOY.md`](STORE-DEPLOY.md): routes, the
