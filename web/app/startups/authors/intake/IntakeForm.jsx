@@ -75,7 +75,9 @@ function sectionProgress(section, values) {
     const words = rows.reduce((sum, row) => sum + wordCount(row.text), 0);
     const checks = [
       rows.length >= 2,
-      rows.every((row) => row.title.trim() && wordCount(row.text) >= MIN_SAMPLE_WORDS),
+      // `[].every()` is true, so an empty form would otherwise claim a finished sample check and
+      // the meter would open at "1 of 39" with nothing answered.
+      rows.length > 0 && rows.every((row) => row.title.trim() && wordCount(row.text) >= MIN_SAMPLE_WORDS),
       words >= MIN_TOTAL_WORDS,
     ];
     return { total: 3, missing: checks.filter((ok) => !ok).length };
