@@ -46,12 +46,36 @@ To make it live (after MX/SPF/DKIM exist on flashtech.biz):
 
 ## Known gaps
 
-- No analytics, no favicon, no OG image (no `og:image` on any page, home included — a copy and
-  asset decision, still open).
+- No analytics, no favicon.
 - Brand palette is a placeholder (navy/electric blue) pending a real brand file.
 - `The Wiz` section is a teaser; character art does not exist.
-- `/` and `/contact` carry no `rel="canonical"` (the store and startups pages do). Pre-existing,
-  not yet fixed.
+
+## Social share images: /og/*.png
+
+Every public page carries an `og:image` and a `twitter:image` (added 2026-11-12, card
+`t_dc397fef`; until then only the store page had one, so every other link unfurled as bare text).
+
+| Page | Image | Source |
+|---|---|---|
+| `/` | `/og/home.png` | composed |
+| `/contact` | `/og/contact.png` | composed |
+| `/apps` | `/og/apps.png` | composed |
+| `/startups` | `/og/startups.png` | composed |
+| `/startups/authors` | `/og/startups-authors.png` | composed |
+| `/apps/taskapp` | `/apps/taskapp/og-image.png` | the store's own card, synced from flash-apps assets |
+
+The composed five are generated, not hand-drawn: `bash scripts/make-og-images.sh` builds each
+1200×630 card from the site's palette (`web/app/globals.css`) plus the TaskApp board screenshot
+already in `~/.hermes/hermes-org/businesses/flash-apps/assets/store/hero-board-dark.png`, scaled
+to the canvas width and bled off the bottom edge. Text is the page name and "Flash Tech" only.
+ffmpeg does the compositing because this host has neither ImageMagick nor pip. Re-run the script
+after a palette or screenshot change; the PNGs under `web/public/og/` are committed so a build
+never depends on ffmpeg being present.
+
+Each page names its image via `openGraph.images` + `twitter:images`, and `metadataBase` in
+`app/layout.jsx` is what makes the URL absolute. `check-store.mjs --built` fails the build if any
+public route has no `og:image`, if the URL is not absolute on `https://flashtech.biz`, if the file
+it names is missing from `web/public`, or if it is not 1200×630.
 
 ## Crawler files: /robots.txt and /sitemap.xml
 
@@ -60,13 +84,23 @@ Both are Next.js metadata routes, so they are generated and cannot drift from th
 | File | What it says |
 |---|---|
 | `web/lib/site.mjs` | The public origin plus the one `PUBLIC_ROUTES` list both routes read. |
-| `web/app/sitemap.js` | The five public routes (`/`, `/apps/taskapp`, `/startups`, `/startups/authors`, `/contact`) with `lastmod` from each page's last source change. |
+| `web/app/sitemap.js` | The six public routes (`/`, `/apps`, `/apps/taskapp`, `/startups`, `/startups/authors`, `/contact`) with `lastmod` from each page's last source change. |
 | `web/app/robots.js` | `User-agent: *`, `Allow: /`, `Disallow: /api/` (form handlers), `Disallow: /apps/taskapp/buy` (checkout redirect), `Sitemap: https://flashtech.biz/sitemap.xml`. |
 
 `web/scripts/check-store.mjs --built` (run by `docker compose build`) asserts the generated bodies:
-both files exist, the robots directives are present, the sitemap contains exactly those five
+both files exist, the robots directives are present, the sitemap contains exactly those six
 `<loc>` values, and neither file carries a dev host/port or an unfilled `{{TOKEN}}`. Deleting a
-metadata route therefore fails the build instead of silently shipping a 404 sitemap.
+metadata route therefore fails the build instead of silently shipping a 404 sitemap. The gate
+pins its own copy of the route list (`PUBLIC_PATHS`) and compares it to `PUBLIC_ROUTES`, so a page
+cannot be added to one and forgotten in the other.
+
+## The apps index: /apps
+
+`web/app/apps/page.jsx` — one heading, one paragraph and one card linking `/apps/taskapp`, on the
+site's shared shell (unlike `/apps/taskapp`, which has its own store stylesheet). It exists
+because `/apps` was a 404 while `/apps/taskapp` was live and indexable, so anyone who trimmed the
+URL hit a dead end. `/apps/` is a single 308 to `/apps` (Next's `trailingSlash: false`; at the
+edge Cloudflare answers the same redirect and it now lands on a real page).
 
 **What Cloudflare does to them (measured 2026-11-12):** the zone used to answer `/robots.txt`
 with 200 and Cloudflare's content-signals comment block even though the container 404'd it. Once

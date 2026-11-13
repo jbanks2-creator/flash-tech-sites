@@ -50,6 +50,13 @@ Next's dev fallback host anywhere, a store `og:image` that is not
 page linking `/apps/taskapp/buy` fails the build. `metadataBase` in `app/layout.jsx` is what makes
 those URLs absolute.
 
+Since 2026-11-12 the same pass also covers the rest of the site: every route in `PUBLIC_ROUTES`
+(`/`, `/apps`, `/apps/taskapp`, `/startups`, `/startups/authors`, `/contact`) must have rendered
+with an absolute `og:image` **and** `twitter:image` naming a real 1200×630 PNG under `web/public`,
+and `/sitemap.xml` must list exactly those six URLs. A page with no share image still loads, so
+without this gate the defect is only ever visible in someone else's social feed. See
+`docs/DEPLOY.md` → "Social share images".
+
 ## Pre-sale state
 
 While `STORE_LIVE` is unset the page is honest about it: buy controls render as inert “Not on sale

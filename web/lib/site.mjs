@@ -11,7 +11,7 @@
 export const SITE_URL = "https://flashtech.biz";
 
 /**
- * The five public routes, in the order they matter.
+ * The six public routes, in the order they matter.
  *
  * `lastModified` is the date the page's own source last changed (git), not the build date —
  * a sitemap that claims every page changed on every deploy teaches crawlers to ignore it.
@@ -23,12 +23,13 @@ export const SITE_URL = "https://flashtech.biz";
  *   /apps/taskapp/inquiry    a form endpoint page, noindex in test mode
  *   /startups/authors/intake  the Starter questionnaire: a form sent to one author at a time,
  *                             `robots: noindex` in its own metadata and deliberately unlinked.
- *                             scripts/check-store.mjs pins the five routes below, so this list is
+ *                             scripts/check-store.mjs pins the six routes below, so this list is
  *                             the only way into the sitemap — adding nothing is the guarantee.
  *   /api/*                   form handlers, disallowed in robots.txt as well
  */
 export const PUBLIC_ROUTES = [
   { path: "/", lastModified: "2026-11-12", changeFrequency: "weekly", priority: 1.0 },
+  { path: "/apps", lastModified: "2026-11-12", changeFrequency: "monthly", priority: 0.8 },
   { path: "/apps/taskapp", lastModified: "2026-11-11", changeFrequency: "weekly", priority: 0.9 },
   { path: "/startups", lastModified: "2026-11-12", changeFrequency: "weekly", priority: 0.7 },
   { path: "/startups/authors", lastModified: "2026-11-12", changeFrequency: "weekly", priority: 0.9 },

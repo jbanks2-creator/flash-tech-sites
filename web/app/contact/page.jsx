@@ -1,9 +1,22 @@
 import '../globals.css';
 import ContactForm from '../ContactForm';
 
+const OG = "/og/contact.png";
+
 export const metadata = {
   title: 'Contact — Flash Tech',
   description: 'Contact Flash Tech — IT support, business phones and AI for small businesses in Sherman, Denison and Grayson County, Texas.',
+  alternates: { canonical: "/contact" },
+  openGraph: {
+    title: 'Contact — Flash Tech',
+    description: 'Contact Flash Tech — IT support, business phones and AI for small businesses in Sherman, Denison and Grayson County, Texas.',
+    url: "/contact",
+    siteName: 'Flash Tech',
+    locale: 'en_US',
+    type: 'website',
+    images: [{ url: OG, width: 1200, height: 630, alt: "Flash Tech — Contact" }],
+  },
+  twitter: { card: 'summary_large_image', images: [OG] },
 };
 
 export default function ContactPage() {

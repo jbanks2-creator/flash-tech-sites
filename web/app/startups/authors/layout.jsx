@@ -15,7 +15,10 @@ export const metadata = {
     description: "AI-drafted, human-reviewed marketing kits for self-published authors.",
     url: "/startups/authors",
     type: "website",
+    locale: "en_US",
+    images: [{ url: "/og/startups-authors.png", width: 1200, height: 630, alt: "Flash Tech — The Author's Candle" }],
   },
+  twitter: { card: "summary_large_image", images: ["/og/startups-authors.png"] },
 };
 
 export default function AuthorsLayout({ children }) {

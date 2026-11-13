@@ -9,17 +9,38 @@
  *   2 When STORE_LIVE=1 — refuse the build unless every decided value is configured:
  *      support address, demo origin on https, checkout URL, zero drafting markers.
  *
+ * `--built` adds a third job after `next build`: read the rendered site and refuse it unless
+ * every public page carries an absolute og:image (and twitter:image) that resolves to a real
+ * 1200x630 PNG, and unless /sitemap.xml lists exactly the public routes. Both defects are
+ * invisible in a browser — a page with no share image still loads, a missing sitemap still 200s
+ * — so they are caught here instead of by a customer.
+ *
  * Run automatically by `npm run build` (prebuild) and by `docker compose build` through it.
  */
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { PUBLIC_ROUTES, SITE_URL } from "../lib/site.mjs";
 
 const WEB = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const errors = [];
 const warnings = [];
 const err = (m) => errors.push(m);
+
+/**
+ * Every public route, pinned here rather than trusted from `lib/site.mjs`.
+ *
+ * `lib/site.mjs` is the source of truth the sitemap and robots.txt are generated from, so this
+ * literal is a second opinion: a page cannot be added to (or dropped from) the indexable site
+ * without this gate being updated in the same commit. The `--built` section compares the two
+ * lists, insists each one rendered, and insists each one carries a share image.
+ */
+const PUBLIC_PATHS = ["/", "/apps", "/apps/taskapp", "/contact", "/startups", "/startups/authors"];
+
+/** Width/height from a PNG's IHDR chunk — `undefined` for anything that is not a PNG. */
+const pngSize = (buf) =>
+  buf.length > 24 && buf.toString("latin1", 1, 4) === "PNG" ? [buf.readUInt32BE(16), buf.readUInt32BE(20)] : null;
 
 // `--built` runs after `next build` and inspects the rendered HTML. The source-level checks
 // below cannot see metadata Next generates (a relative og:image with no metadataBase ships as
@@ -158,6 +179,53 @@ if (built) {
         err("non-live store page links to /apps/taskapp/buy — a pre-sale page must not offer a checkout");
       }
     }
+
+    /* ---- 5b. a share image on every public page --------------------------- */
+    // Measured 2026-11-12: /, /contact, /startups and /startups/authors carried no og:image
+    // at all, so every share of those pages unfurled as a bare link while only the store had a
+    // picture. A missing tag is invisible in a browser, so it gets the same treatment as the
+    // sitemap: assert the route list, the tag in the rendered head, that the URL is absolute on
+    // our own host, and that the file it names is a real 1200x630 PNG we ship.
+    const listedPaths = PUBLIC_ROUTES.map((r) => r.path);
+    // Order in lib/site.mjs is editorial (most important first), so compare as sets.
+    if ([...listedPaths].sort().join("|") !== [...PUBLIC_PATHS].sort().join("|")) {
+      err(`lib/site.mjs PUBLIC_ROUTES (${JSON.stringify(listedPaths)}) is not the list this gate pins (${JSON.stringify(PUBLIC_PATHS)})`);
+    }
+    const htmlFor = (p) => (p === "/" ? join(appHtml, "index.html") : join(appHtml, `${p.slice(1)}.html`));
+    for (const route of PUBLIC_PATHS) {
+      const file = htmlFor(route);
+      if (!existsSync(file)) {
+        err(`public page ${route} has no rendered HTML at ${relative(WEB, file)}`);
+        continue;
+      }
+      const text = readFileSync(file, "utf8");
+      const og = text.match(/<meta property="og:image" content="([^"]+)"/);
+      const tw = text.match(/<meta name="twitter:image" content="([^"]+)"/);
+      if (!og) {
+        err(`${route} has no og:image — the page will share as a bare link`);
+        continue;
+      }
+      const url = og[1];
+      if (!url.startsWith(`${SITE_URL}/`)) {
+        err(`${route} og:image is not an absolute ${SITE_URL} URL (${url})`);
+      } else {
+        const asset = join(WEB, "public", new URL(url).pathname);
+        if (!existsSync(asset)) {
+          err(`${route} og:image ${url} is not a file in web/public (${relative(WEB, asset)})`);
+        } else {
+          const size = pngSize(readFileSync(asset));
+          if (!size || size[0] !== 1200 || size[1] !== 630) {
+            err(`${relative(WEB, asset)} is ${size ? `${size[0]}x${size[1]}` : "not a PNG"}, not the 1200x630 a share card needs`);
+          }
+        }
+      }
+      if (!tw) err(`${route} has no twitter:image`);
+      else if (tw[1] !== url) err(`${route} twitter:image (${tw[1]}) does not match og:image (${url})`);
+      if (!/property="og:url"/.test(text)) err(`${route} has no og:url`);
+      if (!/rel="canonical"/.test(text)) err(`${route} has no canonical link`);
+    }
+    console.log(`check-store: og:image asserted on ${PUBLIC_PATHS.length} public page${PUBLIC_PATHS.length === 1 ? "" : "s"}`);
+
     // The crawler-facing files. Their absence is silent — a 404 sitemap reads as "nothing to
     // report" rather than as a defect, which is exactly how the site shipped without one. So
     // assert the generated bodies: present, well-formed enough, and naming only public routes.
@@ -194,9 +262,7 @@ if (built) {
       const text = readFileSync(sitemapFile, "utf8");
       if (!/<urlset[^>]+sitemaps\.org\/schemas\/sitemap\/0\.9/.test(text)) err("/sitemap.xml is not a sitemap 0.9 urlset");
       const locs = [...text.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]).sort();
-      const expected = ["https://flashtech.biz/", "https://flashtech.biz/apps/taskapp",
-        "https://flashtech.biz/contact", "https://flashtech.biz/startups",
-        "https://flashtech.biz/startups/authors"].sort();
+      const expected = PUBLIC_PATHS.map((p) => (p === "/" ? `${SITE_URL}/` : `${SITE_URL}${p}`)).sort();
       if (locs.join("\n") !== expected.join("\n")) {
         err(`/sitemap.xml lists the wrong URLs (got ${JSON.stringify(locs)})`);
       }

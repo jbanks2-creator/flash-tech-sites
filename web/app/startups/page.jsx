@@ -1,10 +1,22 @@
 import "../globals.css";
 
 /* Flash Tech → Startups: index of ventures that run on the Flash Tech platform but carry their own brand. */
+const OG = "/og/startups.png";
+
 export const metadata = {
   title: "Startups | Flash Tech",
   description: "New ventures built and run by Flash Tech.",
   alternates: { canonical: "/startups" },
+  openGraph: {
+    title: "Startups | Flash Tech",
+    description: "New ventures built and run by Flash Tech.",
+    url: "/startups",
+    siteName: "Flash Tech",
+    locale: "en_US",
+    type: "website",
+    images: [{ url: OG, width: 1200, height: 630, alt: "Flash Tech — Startups" }],
+  },
+  twitter: { card: "summary_large_image", images: [OG] },
 };
 
 const VENTURES = [

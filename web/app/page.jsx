@@ -1,6 +1,26 @@
 import './globals.css';
 import ContactForm from './ContactForm';
 
+/* The home page is the only page with no metadata of its own, so it used to inherit the root
+   layout's head verbatim: no canonical and no share image. Both are set here, and openGraph's
+   siteName/type/locale are repeated because a page's openGraph replaces the layout's rather
+   than merging into it. */
+const OG = "/og/home.png";
+
+export const metadata = {
+  alternates: { canonical: "/" },
+  openGraph: {
+    title: 'Flash Tech — IT, phones and AI for Grayson County businesses',
+    description: 'Managed IT, business phone systems and AI receptionists for small businesses in Sherman, Denison and Grayson County, Texas.',
+    url: "/",
+    siteName: 'Flash Tech',
+    locale: 'en_US',
+    type: 'website',
+    images: [{ url: OG, width: 1200, height: 630, alt: "Flash Tech — Home" }],
+  },
+  twitter: { card: 'summary_large_image', images: [OG] },
+};
+
 const SERVICES = [
   { n: '01', t: 'Tech support', d: 'Remote and on-site help for staff and devices — Windows, Microsoft 365, printers, new-PC setup, user on and offboarding.' },
   { n: '02', t: 'Cloud & Azure', d: 'Tenants, subscriptions and identity set up properly: Entra ID, Azure VMs, backups, cost reviews and migrations.' },
