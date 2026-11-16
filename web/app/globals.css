@@ -88,6 +88,24 @@ footer.site ul{list-style:none;padding:0;margin:0}
 @media (max-width:900px){
   .hero .wrap,.split,.grid.c3,.grid.c2{grid-template-columns:1fr}
   .hero,.hero{grid-template-columns:1fr}
-  nav.top{display:none}
+  /* The header nav used to be display:none here, which left every phone with a logo, a hairline
+     and no way to reach Services / AI / The Wiz or the booking CTA (audit 2026-11-15, Fix 1).
+     Below 900px it now wraps onto its own full-width row under the logo. Each item is a 44px
+     tap target, and the row wraps rather than overflowing, so nothing scrolls sideways. */
+  header.site .wrap{height:auto;min-height:68px;flex-wrap:wrap;gap:2px;padding-top:8px;padding-bottom:10px}
+  nav.top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:2px 8px;width:100%;order:3;margin:0}
+  nav.top a{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 10px;border-radius:8px;font-size:.95rem}
+  nav.top a.btn{padding:0 16px;min-height:44px}
   .wiz{grid-template-columns:1fr;text-align:left}
+}
+/* 601-900px: logo and the four items still fit on one row, so the header keeps its 68px height. */
+@media (min-width:601px) and (max-width:900px){
+  header.site .wrap{flex-wrap:nowrap;min-height:68px;padding-top:0;padding-bottom:0;gap:16px}
+  nav.top{width:auto;flex:1 1 auto;order:0;justify-content:flex-end;gap:2px 12px}
+}
+/* Phones: the wrapped header is two rows (~141px), so sticky would keep a fifth of the screen
+   covered while scrolling. It sits at the top of the page and scrolls away instead; 601px and up
+   stays sticky exactly as before. */
+@media (max-width:600px){
+  header.site{position:static}
 }

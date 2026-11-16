@@ -162,6 +162,10 @@ export default function Page() {
               <p className="note">
                 Prefer to talk? Call or email and you will get Jerry, not a call centre.
               </p>
+              {/* Phone number goes in the sentence above, once Jerry names it:
+                  Prefer to talk? Call <a href="tel:+1XXXXXXXXXX">…</a> or email …
+                  Left as a single obvious slot on purpose - audit 2026-11-15 Fix 3 is held because
+                  no number has been approved, and inventing or publishing one is not ours to do. */}
             </div>
             <div>
               <ContactForm />
@@ -197,7 +201,7 @@ export default function Page() {
             </div>
           </div>
           <div className="fineprint">
-            © {new Date().getFullYear()} Flash Tech. Prices and scope quoted per client. Site under construction — content and brand are placeholders.
+            © {new Date().getFullYear()} Flash Tech. Prices and scope quoted per client.
           </div>
         </div>
       </footer>

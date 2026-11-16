@@ -115,7 +115,7 @@ export default function ContactPage() {
             </div>
           </div>
           <div className="fineprint">
-            © {new Date().getFullYear()} Flash Tech. Prices and scope quoted per client. Site under construction — content and brand are placeholders.
+            © {new Date().getFullYear()} Flash Tech. Prices and scope quoted per client.
           </div>
         </div>
       </footer>
