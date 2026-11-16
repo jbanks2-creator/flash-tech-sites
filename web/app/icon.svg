@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Flash Tech">
+  <!-- The header logo's "F" mark (.logo .mark in globals.css), same geometry as
+       scripts/make-favicon.py. The letter is paths, not text, so no font is needed. -->
+  <defs>
+    <linearGradient id="g" gradientUnits="userSpaceOnUse" x1="3.02" y1="-2.53" x2="60.98" y2="66.53">
+      <stop offset="0" stop-color="#2563eb"/>
+      <stop offset="1" stop-color="#7c3aed"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="18" fill="url(#g)"/>
+  <path d="M20 16h7v32h-7z M20 16h24v7H20z M20 28h19v7H20z" fill="#fff"/>
+</svg>

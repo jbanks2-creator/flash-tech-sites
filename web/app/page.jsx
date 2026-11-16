@@ -160,12 +160,16 @@ export default function Page() {
                 actually at risk, and what it would cost to fix — in writing, in plain English.
               </p>
               <p className="note">
-                Prefer to talk? Call or email and you will get Jerry, not a call centre.
+                Prefer email? Write to{" "}
+                <a href="mailto:TheWiz@FlashTech.Biz">TheWiz@FlashTech.Biz</a> and you will get Jerry,
+                not a call centre.
               </p>
-              {/* Phone number goes in the sentence above, once Jerry names it:
-                  Prefer to talk? Call <a href="tel:+1XXXXXXXXXX">…</a> or email …
-                  Left as a single obvious slot on purpose - audit 2026-11-15 Fix 3 is held because
-                  no number has been approved, and inventing or publishing one is not ours to do. */}
+              {/* No phone number is published: none has been approved, so this page must not ask
+                  anyone to call. When Jerry names one, the sentence becomes:
+                  Prefer to talk? Call <a href="tel:+1XXXXXXXXXX">…</a> or email{" "}
+                  <a href="mailto:TheWiz@FlashTech.Biz">TheWiz@FlashTech.Biz</a> — one line, no
+                  other change. (Audit 2026-11-15 Fix 3 is held for that number; card t_91a317d7
+                  softened the copy in the meantime so nothing promised is missing.) */}
             </div>
             <div>
               <ContactForm />
