@@ -1,0 +1,63 @@
+name: flash-tech
+
+services:
+  web:
+    build:
+      context: ./web
+      args:
+        STORE_LIVE: ${STORE_LIVE:-0}
+        STORE_DEMO_ORIGIN: ${STORE_DEMO_ORIGIN:-}
+        STORE_SUPPORT_EMAIL: ${STORE_SUPPORT_EMAIL:-}
+        LEMONSQUEEZY_CHECKOUT_URL: ${LEMONSQUEEZY_CHECKOUT_URL:-}
+    container_name: flash-tech-web
+    restart: unless-stopped
+    mem_limit: 768m
+    ports:
+      - "127.0.0.1:3401:3000"
+    environment:
+      NODE_ENV: production
+      # Read per request by /apps/taskapp/buy, so a checkout link can be swapped without
+      # rebuilding the image. Never printed in the page.
+      LEMONSQUEEZY_CHECKOUT_URL: ${LEMONSQUEEZY_CHECKOUT_URL:-}
+      # --- Contact-form delivery (/api/contact) -------------------------------------------
+      # The provider is a VALUE, never code: resend | postmark | smtp. Its credential lives in
+      # this project's .env (chmod 600, git-ignored) and is passed through here — never committed,
+      # never logged, never echoed in a response.
+      #
+      # Unset (the pre-launch state) is honest, not broken: the CTA renders as a mailto link to
+      # CONTACT_FALLBACK_EMAIL and POST /api/contact answers 503 naming that address. It never
+      # answers {ok:true} for a message nothing received — that was the stub's defect (t_9c2fc2ff).
+      # A provider set without its key is the loud case: scripts/report-contact-delivery.mjs logs a
+      # critical line at container start and the route still refuses. See docs/DEPLOY.md.
+      CONTACT_PROVIDER: ${CONTACT_PROVIDER:-}
+      CONTACT_API_KEY: ${CONTACT_API_KEY:-}
+      CONTACT_FROM: ${CONTACT_FROM:-}
+      CONTACT_TO: ${CONTACT_TO:-support@flashtech.biz}
+      CONTACT_FALLBACK_EMAIL: ${CONTACT_FALLBACK_EMAIL:-}
+      CONTACT_SMTP_HOST: ${CONTACT_SMTP_HOST:-}
+      CONTACT_SMTP_PORT: ${CONTACT_SMTP_PORT:-587}
+      CONTACT_SMTP_USER: ${CONTACT_SMTP_USER:-}
+      CONTACT_SMTP_PASS: ${CONTACT_SMTP_PASS:-}
+      CONTACT_SMTP_SECURE: ${CONTACT_SMTP_SECURE:-0}
+      CONTACT_POSTMARK_STREAM: ${CONTACT_POSTMARK_STREAM:-outbound}
+      CONTACT_RATE_LIMIT: ${CONTACT_RATE_LIMIT:-5}
+      CONTACT_RATE_WINDOW_SECONDS: ${CONTACT_RATE_WINDOW_SECONDS:-900}
+      # The Author's Candle applications (/api/authors-apply) are written here, one JSON file each.
+      AUTHORS_INBOX: /data/author-inquiries
+      # The Starter questionnaire (/api/authors-intake) validates every submission against the
+      # pipeline's own schema, mounted read-only below, so a stored intake runs through
+      # scripts/validate_intake.py without editing.
+      INTAKE_SCHEMA: /app/schema/intake-starter-v1.json
+      # Cover image + approved voice-over line (schema v2: fields landed by t_7487852d, wired by
+      # t_87bb5c11). ON: the record declares all six fields, the form renders them, buildIntake()
+      # writes what the author gives. Read per request by both the page and the route, so turning it
+      # off while the form still showed the block would drop the answers - the two move together.
+      # See COVER_VO_ENABLED in web/lib/intake-fields.mjs.
+      INTAKE_COVER_VO: ${INTAKE_COVER_VO:-on}
+    volumes:
+      - /home/Jerry/businesses/author-marketing/inquiries:/data/author-inquiries
+      - /home/Jerry/businesses/author-marketing/intake/schema.json:/app/schema/intake-starter-v1.json:ro
+    networks: [flash-tech_net]
+
+networks:
+  flash-tech_net:

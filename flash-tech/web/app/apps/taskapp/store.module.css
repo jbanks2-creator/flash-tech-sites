@@ -1,0 +1,205 @@
+/* TaskApp store page. Shares the site palette (globals.css) and adds only what this
+   long-form product page needs: a dark demo stage, feature rows with real screenshots,
+   tier cards and the FAQ. */
+
+.page { background: #fff; }
+
+.topbar {
+  position: sticky; top: 0; z-index: 30;
+  background: rgba(255, 255, 255, .92); backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+}
+.topbarInner { display: flex; align-items: center; justify-content: space-between; height: 64px; gap: 18px; }
+.crumb { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: .9rem; }
+.crumb a { color: var(--ink); font-weight: 700; }
+.crumb .sep { color: #c3ccdb; }
+.topnav { display: flex; align-items: center; gap: 8px; }
+
+.testChip {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: #fff7e6; color: #7a4b00; border: 1px solid #f2d18b;
+  border-radius: 999px; padding: 4px 10px; font-size: .74rem; font-weight: 800;
+  letter-spacing: .06em; text-transform: uppercase;
+}
+
+/* Pre-sale state: the buy control is present but inert, so nobody can click through to a
+   checkout that does not exist. It reads as an unavailable button, not a link. */
+.buyDisabled { opacity: .55; cursor: not-allowed; }
+
+.hero { padding: 56px 0 40px; background:
+  radial-gradient(900px 380px at 88% -20%, #e8efff 0%, transparent 62%),
+  radial-gradient(620px 280px at 0% 0%, #f3f0ff 0%, transparent 58%), #fff; }
+.heroInner { display: grid; grid-template-columns: 1.02fr .98fr; gap: 48px; align-items: center; }
+.hero h1 { font-size: clamp(2.1rem, 3.6vw, 3.15rem); margin-bottom: .35em; }
+.hero p.lead { font-size: 1.1rem; max-width: 33em; color: var(--body); }
+.heroMeta { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 22px; font-size: .84rem; color: var(--muted); }
+.heroMeta b { color: var(--ink); }
+.ctaRow { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 26px; }
+.ctaNote { margin-top: 12px; font-size: .83rem; color: var(--muted); }
+
+.shot { width: 100%; height: auto; display: block; border-radius: 14px; }
+.shotCard { background: #0b1220; border: 1px solid #1e2a42; border-radius: 18px; padding: 10px;
+  box-shadow: 0 26px 60px -30px rgba(10, 20, 45, .55); }
+.shotCap { color: #93a4c0; font-size: .78rem; padding: 9px 6px 2px; }
+
+.demoBlock { padding: 10px 0 54px; }
+.demoShell { border: 1px solid var(--line); border-radius: 18px; overflow: hidden; background: #0b1220;
+  box-shadow: 0 22px 50px -32px rgba(10, 20, 45, .5); }
+.demoBar { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+  padding: 11px 16px; background: #0b1220; color: #c9d4e6; border-bottom: 1px solid #1e2a42; font-size: .82rem; }
+.demoBar strong { color: #fff; letter-spacing: .04em; }
+.demoBar .dotRow { display: flex; gap: 6px; }
+.demoBar .dotRow i { width: 9px; height: 9px; border-radius: 50%; background: #33415c; display: block; }
+.demoBanner { display: flex; gap: 10px; align-items: flex-start; background: #fff8e8; color: #6b4700;
+  border-bottom: 1px solid #f0d69a; padding: 10px 16px; font-size: .84rem; line-height: 1.45; }
+.demoBanner b { letter-spacing: .05em; }
+.demoFrame { display: block; width: 100%; height: 660px; border: 0; background: #0f1115; }
+.demoFallback { padding: 26px; color: #c9d4e6; font-size: .9rem; }
+.demoFallback a { color: #8fb6ff; }
+.demoFoot { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  padding: 10px 16px; background: #101725; color: #8b9ab5; font-size: .8rem; }
+.demoFoot a { color: #a9c1ea; }
+
+.prose { max-width: 46em; }
+.prose p { font-size: 1.02rem; }
+.sectionLead { max-width: 44em; }
+
+.storyGrid { display: grid; grid-template-columns: 1fr; gap: 26px; }
+
+.feature { display: grid; grid-template-columns: 1.05fr .95fr; gap: 40px; align-items: center; padding: 34px 0;
+  border-top: 1px solid var(--line); }
+.feature:first-of-type { border-top: 0; padding-top: 6px; }
+.feature.flip .featureText { order: 2; }
+.feature.flip .featureShot { order: 1; }
+.feature h3 { font-size: 1.25rem; margin-bottom: .35em; }
+.feature p { margin-bottom: .6em; }
+.feature ul { margin: 0; padding-left: 18px; }
+.feature li { font-size: .95rem; margin: .35em 0; }
+.shotStack { display: grid; gap: 12px; }
+
+.checks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 18px 0 0; padding: 0; list-style: none; }
+.checks li { position: relative; padding-left: 26px; font-size: .94rem; }
+.checks li::before { content: "✓"; position: absolute; left: 0; top: -1px; color: var(--accent); font-weight: 800; }
+
+.pricingGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: stretch; }
+.tier { display: flex; flex-direction: column; background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 26px; }
+.tier.lead { border-color: #b9cdfb; box-shadow: 0 18px 40px -28px rgba(37, 99, 235, .55); }
+.tierTag { align-self: flex-start; font-size: .72rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--accent); background: var(--accent-soft); border-radius: 999px; padding: 5px 10px; margin-bottom: 12px; }
+.tier .price { display: flex; align-items: baseline; gap: 8px; margin: 2px 0 4px; }
+.tier .price strong { font-size: 2.2rem; color: var(--ink); letter-spacing: -.02em; }
+.tier .price span { color: var(--muted); font-size: .9rem; }
+.tier .what { color: var(--body); font-size: .95rem; min-height: 3.2em; }
+.tier dl { display: grid; grid-template-columns: auto 1fr; gap: 8px 14px; margin: 12px 0 20px; font-size: .9rem; }
+.tier dt { color: var(--muted); font-weight: 650; }
+.tier dd { margin: 0; color: var(--ink-2); }
+.tier .btn { margin-top: auto; text-align: center; }
+.tierNote { font-size: .8rem; color: var(--muted); margin-top: 12px; }
+.taxNote { font-size: .82rem; color: var(--muted); margin-top: 16px; max-width: 48em; }
+
+.faq { display: grid; gap: 10px; max-width: 52em; }
+.faq details { border: 1px solid var(--line); border-radius: 12px; background: #fff; padding: 0 18px; }
+.faq details[open] { border-color: #c9d8f8; }
+.faq summary { cursor: pointer; list-style: none; padding: 16px 0; font-weight: 700; color: var(--ink); font-size: 1rem; }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: "+"; float: right; color: var(--accent); font-weight: 800; }
+.faq details[open] summary::after { content: "–"; }
+.faq .answer { padding: 0 0 16px; font-size: .95rem; }
+.faq .answer p:last-child { margin-bottom: 0; }
+
+.objection { background: #0b1220; color: #c9d4e6; border-radius: 20px; padding: 34px; }
+.objection h2 { color: #fff; }
+.objection p { color: #a9b8d1; font-size: .98rem; }
+.objection strong { color: #fff; }
+.objection .accent { color: #8fb6ff; }
+
+.mobileStrip { display: grid; grid-template-columns: 320px 1fr; gap: 34px; align-items: center; }
+.mobileStrip img { border-radius: 18px; border: 1px solid #1e2a42; background: #0b1220; }
+
+.footer { background: #0b1220; color: #93a4c0; padding: 46px 0 34px; margin-top: 10px; }
+.footer a { color: #c9d4e6; }
+.footerCols { display: grid; grid-template-columns: 1.2fr repeat(3, 1fr); gap: 28px; }
+.footer h4 { color: #fff; font-size: .82rem; letter-spacing: .1em; text-transform: uppercase; margin: 0 0 10px; }
+.footer ul { list-style: none; padding: 0; margin: 0; }
+.footer li { font-size: .88rem; margin: .35em 0; }
+.footer .fine { border-top: 1px solid #1e2a42; margin-top: 28px; padding-top: 16px; font-size: .8rem; color: #6c7d99;
+  display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+
+.draftBanner { background: #fff4f4; border: 1px solid #f0b4b4; color: #7a1f1f; border-radius: 12px;
+  padding: 12px 16px; font-size: .86rem; margin-bottom: 22px; }
+.draftBanner b { letter-spacing: .04em; }
+
+.legalPage { max-width: 50em; padding: 44px 0 70px; }
+.legalPage h1 { font-size: clamp(1.8rem, 3vw, 2.5rem); }
+.legalMeta { color: var(--muted); font-size: .88rem; margin-bottom: 26px; }
+.legalPage :global(h2) { font-size: 1.3rem; margin-top: 1.7em; }
+.legalPage :global(h3) { font-size: 1.02rem; margin-top: 1.4em; }
+.legalPage :global(p), .legalPage :global(li) { font-size: .95rem; color: var(--body); }
+.legalPage :global(ul), .legalPage :global(ol) { padding-left: 20px; }
+.legalPage :global(blockquote) { margin: 1.2em 0; padding: 12px 16px; border-left: 3px solid var(--accent);
+  background: var(--bg-2); border-radius: 0 10px 10px 0; color: var(--ink-2); }
+.legalPage :global(blockquote p) { margin: 0; font-size: .92rem; }
+.legalPage :global(.md-table) { overflow-x: auto; margin: 1.2em 0; }
+.legalPage :global(table) { border-collapse: collapse; width: 100%; font-size: .88rem; }
+.legalPage :global(th), .legalPage :global(td) { border: 1px solid var(--line); padding: 7px 10px; text-align: left; vertical-align: top; }
+.legalPage :global(th) { background: var(--bg-2); color: var(--ink); }
+.legalPage :global(code) { background: var(--bg-2); border-radius: 5px; padding: 1px 5px; font-size: .86em; }
+.legalPage :global(h1), .legalPage :global(h2), .legalPage :global(h3) { color: var(--ink); }
+.draftMarker { background: #fff0b3; color: #6b4a00; padding: 0 4px; border-radius: 4px; }
+.markIndex { font-size: .85rem; color: var(--muted); margin-bottom: 18px; }
+
+.changelog { max-width: 52em; padding: 44px 0 70px; }
+.changelog :global(h2) { font-size: 1.25rem; margin-top: 1.8em; padding-top: 1.2em; border-top: 1px solid var(--line); }
+.changelog :global(h2:first-of-type) { border-top: 0; padding-top: 0; margin-top: 1em; }
+.changelog :global(h3) { font-size: .82rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-top: 1.5em; }
+.changelog :global(li) { font-size: .94rem; margin: .35em 0; }
+
+.inquiry { max-width: 640px; padding: 44px 0 70px; }
+.inquiry form { display: grid; gap: 12px; margin-top: 20px; }
+.inquiry label { font-size: .82rem; font-weight: 700; color: var(--ink); }
+.inquiry input, .inquiry textarea, .inquiry select { width: 100%; padding: 11px 13px; border: 1px solid var(--line);
+  border-radius: 10px; font: inherit; font-size: .95rem; background: #fff; }
+.inquiry textarea { min-height: 120px; resize: vertical; }
+
+.notConfigured { padding: 60px 0; max-width: 46em; }
+
+@media (max-width: 980px) {
+  .heroInner, .feature, .feature.flip .featureText, .feature.flip .featureShot,
+  .pricingGrid, .mobileStrip, .footerCols { grid-template-columns: 1fr; }
+  .feature.flip .featureText, .feature.flip .featureShot { order: initial; }
+  .checks { grid-template-columns: 1fr; }
+  .demoFrame { height: 560px; }
+  .footerCols { gap: 24px; }
+
+  /* The header carries a real primary action ("Ask about TaskApp") while the store is
+     pre-sale; drop the duplicate demo link earlier and stop the chip and crumb wrapping,
+     so the top bar stays one line down to the 640px rules. The hero's demo button is the
+     same target and is visible on the same screen. */
+  .topnav a[href="#demo"] { display: none; }
+  .testChip { white-space: nowrap; }
+  .crumb .logo { white-space: nowrap; }
+}
+@media (max-width: 640px) {
+  .hero { padding: 34px 0 26px; }
+  .hero h1 { font-size: 2rem; }
+  .testChip { display: none; }
+  .demoFrame { height: 520px; }
+  .tier { padding: 20px; }
+  .objection { padding: 24px; }
+  .mobileStrip { grid-template-columns: 1fr; }
+  .mobileStrip img { max-width: 320px; margin: 0 auto; }
+
+  /* The header was forcing a 462 px layout viewport at 390: the crumb and two buttons
+     could not shrink. Drop the crumb's "Apps /" and the duplicate demo link; the hero's
+     demo button is the same target on the same screen. */
+  .topbarInner { height: auto; min-height: 56px; padding: 8px 0; gap: 8px; }
+  .crumb { min-width: 0; overflow: hidden; white-space: nowrap; gap: 4px; font-size: .82rem; }
+  .crumb .logo { flex: none; }
+  .crumbApps, .sep { display: none; }
+  /* The header's primary action is wider in pre-sale state ("Ask about TaskApp"), so drop the
+     current-page crumb too: a clipped "TaskA…" against the button reads as a layout bug. */
+  .crumbCurrent { display: none; }
+  .topnav { flex: none; gap: 6px; }
+  .topnav a[href="#demo"] { display: none; }
+  .topnav .btn { padding: 9px 12px; font-size: .82rem; }
+}

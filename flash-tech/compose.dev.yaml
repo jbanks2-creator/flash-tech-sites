@@ -1,0 +1,11 @@
+# Dev overrides: hot reload, no image build. Use with:
+#   docker compose -f compose.yaml -f compose.dev.yaml up
+services:
+  web:
+    build: null
+    image: node:22-alpine
+    mem_limit: 768m
+    working_dir: /app
+    command: sh -c "npm install --no-audit --no-fund && npm run dev -- -p 3000 -H 0.0.0.0"
+    volumes:
+      - ./web:/app
