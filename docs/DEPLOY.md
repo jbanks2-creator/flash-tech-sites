@@ -35,14 +35,101 @@ docker logs -f flash-tech-web
 2. **No Tailwind.** Plain CSS in `app/globals.css` with custom properties. Fewer build dependencies for v1; Tailwind can be added without changing the markup contract.
 3. **No backup script.** Nothing stateful to back up until the DB exists.
 
-## The contact form is a stub
+## The contact form: delivery is configuration, and an unconfigured form refuses
 
-`/api/contact` validates name + email and **logs the payload to the container stdout**. It sends no mail.
+`/api/contact` is the site's only call to action — it appears on `/`, `/contact` and the
+(unpublished) `/hermes-department` offer page.
 
-To make it live (after MX/SPF/DKIM exist on flashtech.biz):
-- Postmark or Resend server token in `.env` (chmod 600, git-ignored)
-- Send to `TheWiz@FlashTech.Biz` with the submitter as reply-to
-- Add rate limiting and a honeypot before it is public
+**Until 2026-11-17 it was a stub**: it validated name + email, wrote the whole submission to the
+container log and answered `{ok:true}`. No mail, no storage, no queue. Every visitor was told their
+message had arrived; nothing had. Card `t_9c2fc2ff`, fixed in the commit named in `registry.yaml`.
+
+What it does now — the only success is a real one:
+
+| Status | When | What the visitor sees |
+|---|---|---|
+| `200 {ok:true, received:true}` | the provider accepted the message | "your message is on its way to Jerry" |
+| `400` | malformed body, missing/invalid name, email or an over-cap field | the field named, "nothing was sent" |
+| `429` | over `CONTACT_RATE_LIMIT` in `CONTACT_RATE_WINDOW_SECONDS` from one client | retry time + the email address |
+| `502` | the provider refused or could not be reached | "it was not sent" + the email address |
+| `503` | **delivery is not configured on this deployment** | "email support@flashtech.biz" |
+
+`GET /api/contact` answers `{ready, email}`. The page uses it to decide whether to render the form
+at all: with delivery unconfigured, every page renders an **email link** instead of a form, so
+nothing on the page promises something the server would refuse. The mailto block is also what the
+server-rendered HTML contains, so the pages stay statically generated (`scripts/check-store.mjs
+--built` fails if `/`, `/contact` or `/apps` lose their rendered HTML) and a reader without
+JavaScript always has a working path.
+
+### Turning delivery on (Jerry's credential, one provider)
+
+The provider is a value, not code: `CONTACT_PROVIDER=resend | postmark | smtp`. Put the names in
+`.env` (chmod 600, git-ignored — `.env.example` lists every one), then `docker compose up -d web`.
+No rebuild: the route reads the config per request.
+
+| Provider | Needs | DNS |
+|---|---|---|
+| `resend` | `CONTACT_API_KEY` (`re_…`) | the domain must be verified in Resend: a DKIM TXT record and an SPF include on `flashtech.biz` |
+| `postmark` | `CONTACT_API_KEY` (server token) | a DKIM TXT record on the domain / sender signature |
+| `smtp` | `CONTACT_SMTP_HOST`, `_PORT`, `_USER`, `_PASS` | none, but an app password from a mailbox; weakest deliverability for a business inbox |
+
+`CONTACT_FROM` must be an address on the verified domain (e.g. `Flash Tech website
+<website@flashtech.biz>`), and `CONTACT_TO` defaults to `support@flashtech.biz`. The submitter's
+address is carried as `Reply-To`, never as `From`.
+
+Two addresses, two jobs:
+
+| Variable | Default | What it is |
+|---|---|---|
+| `CONTACT_TO` | `support@flashtech.biz` | where a delivered message goes |
+| `CONTACT_FALLBACK_EMAIL` | `TheWiz@FlashTech.Biz` | what the page tells a visitor to write to when the form cannot send |
+
+The fallback is the address the site's own copy already publishes on `/`, `/contact` and the offer
+page (a page that says "write to TheWiz@" and then offers a button saying "email support@" reads
+like a bug). Both are live Cloudflare Email Routing routes forwarding to the same Gmail — see the
+`flashtech.biz` line in `~/hermes-org/registry.yaml`. Set `CONTACT_FALLBACK_EMAIL` to unify them.
+
+### Startup tells the truth before a visitor does
+
+`web/scripts/report-contact-delivery.mjs` runs from the image's `CMD` before `node server.js` and
+logs one line — no credential, no config dump:
+
+```
+{"kind":"contact-delivery-config","outcome":"disabled","severity":"info","provider":"none",
+ "to":"support@flashtech.biz","reason":"no-provider", ...}
+```
+
+- `outcome:"ready"` — the form sends.
+- `outcome:"disabled"`, `reason:"no-provider"` — **the expected pre-launch state**: the CTA is the
+  email link and POST answers 503 naming it. Nothing is lost, nothing lies.
+- `outcome:"misconfigured"`, `severity:"critical"` — a provider is selected but its key is missing
+  (or `CONTACT_FROM`/`CONTACT_TO` is unusable). Someone meant mail to work. It still refuses
+  honestly; the process does not exit, because taking the front door down is worse than serving a
+  mailto link.
+
+### Spam control
+
+A honeypot (`hp_website`, per the rule in `lib/contact-fields.mjs`) checked before validation, and a
+per-client sliding window (`CONTACT_RATE_LIMIT`, default 5 per 15 minutes) keyed on
+`CF-Connecting-IP` with `X-Forwarded-For` as the fallback. A filled trap gets `200 {ok:true}` and no
+mail; the log line carries `outcome:"discarded"`, `sent:false`, which no delivered message has.
+
+### The submission log
+
+One JSON line per submission: `outcome` (`sent` / `refused` / `discarded` / `rate-limited` /
+`unconfigured` / `failed`), `provider`, the provider's message id, a 12-hex hash of the client IP and
+which header supplied it. **No name, no email address, no phone, no message body.** The stub logged
+all of it.
+
+### Verifying delivery end to end
+
+1. `docker logs flash-tech-web | head -3` → the `contact-delivery-config` line says `ready`.
+2. Fill the form on `https://flashtech.biz/contact` in a browser (not curl — the honeypot and the
+   readiness fetch are part of the path).
+3. `docker logs flash-tech-web | grep '"kind":"contact"' | tail -1` → `outcome:"sent"` with a
+   `message_id` and `ip_source:"cf-connecting-ip"`.
+4. The message is in the `support@flashtech.biz` inbox with name, address and message intact, and
+   **Reply** goes to the submitter.
 
 ## Known gaps
 
