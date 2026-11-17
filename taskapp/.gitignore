@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.env
+*.log
+
+# Website demo build (scripts/build-demo.sh)
+demo/site.html
+demo/site.sha256

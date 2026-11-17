@@ -1,0 +1,6 @@
+# Dev overrides: publish on loopback only. Never served on a public port.
+# Port allocation: PLATFORM.md §5 -> 127.0.0.1:3601 (recorded there).
+services:
+  web:
+    ports:
+      - "127.0.0.1:3601:80"

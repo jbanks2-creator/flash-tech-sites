@@ -1,0 +1,39 @@
+name: taskapp
+
+# TaskApp is a single self-contained HTML file. There is no database, no build
+# step and no server-side code: the container exists only to serve index.html.
+# All user state lives in the visitor's browser localStorage.
+
+services:
+  web:
+    image: nginx:1.27-alpine
+    container_name: taskapp-web
+    mem_limit: 128m
+    restart: unless-stopped
+    volumes:
+      - ./index.html:/usr/share/nginx/html/index.html:ro
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "127.0.0.1:3601:80"
+    networks:
+      - taskapp_net
+
+  # Website demo: the same single file, served from its own origin on purpose. The store
+  # page embeds it with ?demo=1 so a visitor cannot write storage that a later real install
+  # would read. Built by scripts/build-demo.sh from dist/, never edited by hand.
+  demo:
+    image: nginx:1.27-alpine
+    container_name: taskapp-demo
+    mem_limit: 64m
+    restart: unless-stopped
+    volumes:
+      - ./demo/site.html:/usr/share/nginx/html/site.html:ro
+      - ./demo/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "127.0.0.1:3602:80"
+    networks:
+      - taskapp_net
+
+networks:
+  taskapp_net:
+    name: taskapp_net

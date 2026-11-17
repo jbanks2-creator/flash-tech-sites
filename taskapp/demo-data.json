@@ -1,0 +1,724 @@
+{
+  "format": "taskapp-export",
+  "version": 1,
+  "app_version": "1.0.0-rc.2",
+  "demo": true,
+  "demo_anchor": "2026-11-08",
+  "exported_at": "2026-11-08T20:00:00.000Z",
+  "domains": [
+    {
+      "id": "d-northgate",
+      "name": "Northgate Dental",
+      "weight": 1.4,
+      "color": "#0ea5e9",
+      "sort_order": 1
+    },
+    {
+      "id": "d-lakeside",
+      "name": "Lakeside Realty",
+      "weight": 1.2,
+      "color": "#8b5cf6",
+      "sort_order": 2
+    },
+    {
+      "id": "d-summit",
+      "name": "Summit HVAC",
+      "weight": 1.1,
+      "color": "#f59e0b",
+      "sort_order": 3
+    },
+    {
+      "id": "d-internal",
+      "name": "Internal / Ops",
+      "weight": 1.3,
+      "color": "#64748b",
+      "sort_order": 4
+    }
+  ],
+  "projects": [
+    {
+      "id": "p-northgate-network",
+      "name": "Northgate — network refresh",
+      "domain_id": "d-northgate",
+      "description": "Replace the ageing switch stack and two access points. Cutover runs after the practice closes, 6pm Tuesday.",
+      "criticality": 5,
+      "status": "active",
+      "due_date": "2026-11-26",
+      "created_at": "2026-10-15T14:05:00.000Z",
+      "updated_at": "2026-11-07T14:05:00.000Z",
+      "archived_at": null
+    },
+    {
+      "id": "p-lakeside-site",
+      "name": "Lakeside — website rebuild",
+      "domain_id": "d-lakeside",
+      "description": "New listing theme, agent pages, redirects from the old URLs. Content comes from the office manager.",
+      "criticality": 4,
+      "status": "active",
+      "due_date": "2026-12-10",
+      "created_at": "2026-10-20T14:05:00.000Z",
+      "updated_at": "2026-11-06T14:05:00.000Z",
+      "archived_at": null
+    },
+    {
+      "id": "p-summit-backup",
+      "name": "Summit — backup rollout",
+      "domain_id": "d-summit",
+      "description": "NAS plus offsite replication for the office share and the dispatch database. Test restore before sign-off.",
+      "criticality": 3,
+      "status": "active",
+      "due_date": "2026-11-20",
+      "created_at": "2026-10-27T14:05:00.000Z",
+      "updated_at": "2026-11-05T14:05:00.000Z",
+      "archived_at": null
+    },
+    {
+      "id": "p-internal-q4",
+      "name": "Q4 internal ops",
+      "domain_id": "d-internal",
+      "description": "Licences, invoicing, patching and the onboarding checklist. The work that keeps the lights on.",
+      "criticality": 2,
+      "status": "active",
+      "due_date": null,
+      "created_at": "2026-09-29T14:05:00.000Z",
+      "updated_at": "2026-11-07T14:05:00.000Z",
+      "archived_at": null
+    }
+  ],
+  "tasks": [
+    {
+      "id": "t-ng-rack",
+      "title": "Photograph server rack and label patch panel",
+      "description": "Needed before the cutover so we can put every cable back where it was.",
+      "domain_id": "d-northgate",
+      "project_id": "p-northgate-network",
+      "status": "todo",
+      "position": 1024,
+      "priority": "medium",
+      "due_date": "2026-11-05",
+      "recurrence": "none",
+      "recurrence_interval": 1,
+      "recurrence_parent_id": null,
+      "research_id": null,
+      "source": "demo",
+      "external_id": null,
+      "created_at": "2026-11-02T15:20:00.000Z",
+      "updated_at": "2026-11-07T17:30:00.000Z",
+      "completed_at": null,
+      "archived_at": null
+    },
+    {
+      "id": "t-ng-switch",
+      "title": "Order replacement 48-port switch",
+      "description": "Quote #4471 approved. Two-week lead time — order today or the cutover slips.",
+      "domain_id": "d-northgate",
+      "project_id": "p-northgate-network",
+      "status": "todo",
+      "position": 2048,
+      "priority": "high",
+      "due_date": "2026-11-07",
+      "recurrence": "none",
+      "recurrence_interval": 1,
+      "recurrence_parent_id": null,
+      "research_id": null,
+      "source": "demo",
+      "external_id": null,
+      "created_at": "2026-11-01T15:20:00.000Z",
+      "updated_at": "2026-11-07T17:30:00.000Z",
+      "completed_at": null,
+      "archived_at": null
+    },
+    {
+      "id": "t-ng-schedule",
+      "title": "Confirm after-hours cutover with the practice manager",
+      "description": "Practice closes 5:30pm. Confirm the alarm contact and who stays on site.",
+      "domain_id": "d-northgate",
+      "project_id": "p-northgate-network",
+      "status": "in_progress",
+      "position": 1024,
+      "priority": "high",
+      "due_date": "2026-11-09",
+      "recurrence": "none",
+      "recurrence_interval": 1,
+      "recurrence_parent_id": null,
+      "research_id": null,
+      "source": "demo",
+      "external_id": null,
+      "created_at": "2026-10-31T15:20:00.000Z",
+      "updated_at": "2026-11-07T17:30:00.000Z",
+      "completed_at": null,
+      "archived_at": null
+    },
+    {
+      "id": "t-ng-config",
+      "title": "Stage switch config from the running backup",
+      "description": "Restore the config to the spare switch and verify VLANs, trunks and the phone system.",
+      "domain_id": "d-northgate",
+      "project_id": "p-northgate-network",
+      "status": "todo",
+      "position": 3072,
+      "priority": "high",
+      "due_date": "2026-11-10",
+      "recurrence": "none",
+      "recurrence_interval": 1,
+      "recurrence_parent_id": null,
+      "research_id": null,
+      "source": "demo",
+      "external_id": null,
+      "created_at": "2026-10-30T15:20:00.000Z",
+      "updated_at": "2026-11-07T17:30:00.000Z",
+      "completed_at": null,
+      "archived_at": null
+    },
+    {
+      "id": "t-ng-cutover",
+      "title": "Cutover night — swap the switch stack",
+      "description": "",
+      "domain_id": "d-northgate",
+      "project_id": "p-northgate-network",
+      "status": "todo",
+      "position": 4096,
+      "priority": "high",
+      "due_date": "2026-11-18T18:00",
+      "recurrence": "none",
+      "recurrence_interval": 1,
+      "recurrence_parent_id": null,
+      "research_id": null,
+      "source": "demo",
+      "external_id": null,
+      "created_at": "2026-10-29T15:20:00.000Z",
+      "updated_at": "2026-11-07T17:30:00.000Z",
+      "completed_at": null,
+      "archived_at": null
+    },
+    {
+      "id": "t-ng-check",
+      "title": "Post-cutover check: phones, X-ray upload, Wi-Fi",
+      "description": "",
+      "domain_id": "d-northgate",
+      "project_id": "p-northgate-network",
+      "status": "todo",
+      "position": 5120,
+      "priority": "medium",
+      "due_date": "2026-11-19",
+      "recurrence": "none",
+      "recurrence_interval": 1,
+      "recurrence_parent_id": null,
+      "research_id": null,
+      "source": "demo",
+      "external_id": null,
+      "created_at": "2026-10-28T15:20:00.000Z",
+      "updated_at": "2026-11-07T17:30:00.000Z",
+      "completed_at": null,
+      "archived_at": null
+    },
+    {
+      "id": "t-ng-diagram",
+      "title": "Update the network diagram",
+      "description": "",
+      "domain_id": "d-northgate",
+      "project_id": "p-northgate-network",
+      "status": "todo",
+      "position": 6144,
+      "priority": "low",
+      "due_date": "2026-11-17",
+      "recurrence": "none",
+      "recurrence_interval": 1,
+      "recurrence_parent_id": null,
+      "research_id": null,
+      "source": "demo",
+      "external_id": null,
+      "created_at": "2026-10-27T15:20:00.000Z",
+      "updated_at": "2026-11-07T17:30:00.000Z",
+      "completed_at": null,
+      "archived_at": null
+    },
+    {
+      "id": "t-lk-theme",
+      "title": "Migrate the listings grid to the new theme",
+      "description": "Search, filters and the map panel. Keep the existing IDX widget untouched.",
+      "domain_id": "d-lakeside",
+      "project_id": "p-lakeside-site",
+      "status": "in_progress",
+      "position": 1024,
+      "priority": "medium",
+      "due_date": "2026-11-12",
+      "recurrence": "none",
+      "recurrence_interval": 1,
+      "recurrence_parent_id": null,
+      "research_id": null,
+      "source": "demo",
+      "external_id": null,
+      "created_at": "2026-10-26T15:20:00.000Z",
+      "updated_at": "2026-11-07T17:30:00.000Z",
+      "completed_at": null,
+      "archived_at": null
+    },
+    {
+      "id": "t-lk-headshots",
+      "title": "Collect agent headshots and bios",
+      "description": "",
+      "domain_id": "d-lakeside",
+      "project_id": "p-lakeside-site",
+      "status": "blocked",
+      "position": 1024,
+      "priority": "medium",
+      "due_date": "2026-11-10",
+      "recurrence": "none",
+      "recurrence_interval": 1,
+      "recurrence_parent_id": null,
+      "research_id": null,
+      "source": "demo",
+      "external_id": null,
+      "created_at": "2026-10-25T15:20:00.000Z",
+      "updated_at": "2026-11-07T17:30:00.000Z",
+      "completed_at": null,
+      "archived_at": null
+    },
+    {
+      "id": "t-lk-redirects",
+      "title": "Set up 301 redirects for the old listing URLs",
+      "description": "Every /listing/<id> URL has to land on the new page or the search rankings go with it.",
+      "domain_id": "d-lakeside",
+      "project_id": "p-lakeside-site",
+      "status": "todo",
+      "position": 2048,
+      "priority": "medium",
+      "due_date": "2026-11-16",
+      "recurrence": "none",
+      "recurrence_interval": 1,
+      "recurrence_parent_id": null,
+      "research_id": null,
+      "source": "demo",
+      "external_id": null,
+      "created_at": "2026-11-02T15:20:00.000Z",
+      "updated_at": "2026-11-07T17:30:00.000Z",
+      "completed_at": null,
+      "archived_at": null
+    },
+    {
+      "id": "t-lk-signoff",
+      "title": "Client sign-off on the homepage",
+      "description": "",
+      "domain_id": "d-lakeside",
+      "project_id": "p-lakeside-site",
+      "status": "todo",
+      "position": 3072,
+      "priority": "high",
+      "due_date": "2026-11-22",
+      "recurrence": "none",
+      "recurrence_interval": 1,
+      "recurrence_parent_id": null,
+      "research_id": null,
+      "source": "demo",
+      "external_id": null,
+      "created_at": "2026-11-01T15:20:00.000Z",
+      "updated_at": "2026-11-07T17:30:00.000Z",
+      "completed_at": null,
+      "archived_at": null
+    },
+    {
+      "id": "t-sm-audit",
+      "title": "Audit the current backup jobs",
+      "description": "",
+      "domain_id": "d-summit",
+      "project_id": "p-summit-backup",
+      "status": "completed",
+      "position": 1024,
+      "priority": "medium",
+      "due_date": null,
+      "recurrence": "none",
+      "recurrence_interval": 1,
+      "recurrence_parent_id": null,
+      "research_id": null,
+      "source": "demo",
+      "external_id": null,
+      "created_at": "2026-10-31T09:00:00.000Z",
+      "updated_at": "2026-11-05T16:40:00.000Z",
+      "completed_at": "2026-11-05T16:40:00.000Z",
+      "archived_at": null
+    },
+    {
+      "id": "t-sm-quote",
+      "title": "Quote the NAS and offsite replication",
+      "description": "4 TB usable, nightly copy to the owner's office in Denison. Include the first year of support.",
+      "domain_id": "d-summit",
+      "project_id": "p-summit-backup",
+      "status": "todo",
+      "position": 2048,
+      "priority": "high",
+      "due_date": "2026-11-09",
+      "recurrence": "none",
+      "recurrence_interval": 1,
+      "recurrence_parent_id": null,
+      "research_id": null,
+      "source": "demo",
+      "external_id": null,
+      "created_at": "2026-10-30T15:20:00.000Z",
+      "updated_at": "2026-11-07T17:30:00.000Z",
+      "completed_at": null,
+      "archived_at": null
+    },
+    {
+      "id": "t-sm-agent",
+      "title": "Install the backup agent on the office PCs",
+      "description": "",
+      "domain_id": "d-summit",
+      "project_id": "p-summit-backup",
+      "status": "todo",
+      "position": 3072,
+      "priority": "medium",
+      "due_date": "2026-11-14",
+      "recurrence": "none",
+      "recurrence_interval": 1,
+      "recurrence_parent_id": null,
+      "research_id": null,
+      "source": "demo",
+      "external_id": null,
+      "created_at": "2026-10-29T15:20:00.000Z",
+      "updated_at": "2026-11-07T17:30:00.000Z",
+      "completed_at": null,
+      "archived_at": null
+    },
+    {
+      "id": "t-sm-restore",
+      "title": "Test a restore of the accounting share",
+      "description": "Restore to a spare drive, open three files, then delete the test copy. A backup nobody restored is a hope.",
+      "domain_id": "d-summit",
+      "project_id": "p-summit-backup",
+      "status": "todo",
+      "position": 4096,
+      "priority": "high",
+      "due_date": "2026-11-15",
+      "recurrence": "none",
+      "recurrence_interval": 1,
+      "recurrence_parent_id": null,
+      "research_id": null,
+      "source": "demo",
+      "external_id": null,
+      "created_at": "2026-10-28T15:20:00.000Z",
+      "updated_at": "2026-11-07T17:30:00.000Z",
+      "completed_at": null,
+      "archived_at": null
+    },
+    {
+      "id": "t-ops-licences",
+      "title": "Renew MSP software licences",
+      "description": "RMM, PSA and the ticketing mailbox. Renews annually — check the seat count before paying.",
+      "domain_id": "d-internal",
+      "project_id": "p-internal-q4",
+      "status": "todo",
+      "position": 1024,
+      "priority": "high",
+      "due_date": "2026-11-08",
+      "recurrence": "none",
+      "recurrence_interval": 1,
+      "recurrence_parent_id": null,
+      "research_id": null,
+      "source": "demo",
+      "external_id": null,
+      "created_at": "2026-10-27T15:20:00.000Z",
+      "updated_at": "2026-11-07T17:30:00.000Z",
+      "completed_at": null,
+      "archived_at": null
+    },
+    {
+      "id": "t-ops-invoices",
+      "title": "Send this month's invoices",
+      "description": "",
+      "domain_id": "d-internal",
+      "project_id": "p-internal-q4",
+      "status": "completed",
+      "position": 2048,
+      "priority": "high",
+      "due_date": null,
+      "recurrence": "none",
+      "recurrence_interval": 1,
+      "recurrence_parent_id": null,
+      "research_id": null,
+      "source": "demo",
+      "external_id": null,
+      "created_at": "2026-10-31T09:00:00.000Z",
+      "updated_at": "2026-11-03T11:20:00.000Z",
+      "completed_at": "2026-11-03T11:20:00.000Z",
+      "archived_at": null
+    },
+    {
+      "id": "t-ops-patch",
+      "title": "Weekly patching window for client servers",
+      "description": "Sunday 2am. Patch, reboot, check the backups ran.",
+      "domain_id": "d-internal",
+      "project_id": "p-internal-q4",
+      "status": "todo",
+      "position": 3072,
+      "priority": "medium",
+      "due_date": "2026-11-10",
+      "recurrence": "weekly",
+      "recurrence_interval": 1,
+      "recurrence_parent_id": null,
+      "research_id": null,
+      "source": "demo",
+      "external_id": null,
+      "created_at": "2026-10-25T15:20:00.000Z",
+      "updated_at": "2026-11-07T17:30:00.000Z",
+      "completed_at": null,
+      "archived_at": null
+    },
+    {
+      "id": "t-ops-ssl",
+      "title": "Renew SSL certificates across client sites",
+      "description": "Six sites on the shared wildcard. Set a calendar reminder 30 days out next time.",
+      "domain_id": "d-internal",
+      "project_id": "p-internal-q4",
+      "status": "todo",
+      "position": 4096,
+      "priority": "high",
+      "due_date": "2026-11-11",
+      "recurrence": "none",
+      "recurrence_interval": 1,
+      "recurrence_parent_id": null,
+      "research_id": null,
+      "source": "demo",
+      "external_id": null,
+      "created_at": "2026-11-02T15:20:00.000Z",
+      "updated_at": "2026-11-07T17:30:00.000Z",
+      "completed_at": null,
+      "archived_at": null
+    },
+    {
+      "id": "t-ops-onboard",
+      "title": "Update the client onboarding checklist",
+      "description": "",
+      "domain_id": "d-internal",
+      "project_id": "p-internal-q4",
+      "status": "todo",
+      "position": 5120,
+      "priority": "low",
+      "due_date": null,
+      "recurrence": "none",
+      "recurrence_interval": 1,
+      "recurrence_parent_id": null,
+      "research_id": null,
+      "source": "demo",
+      "external_id": null,
+      "created_at": "2026-11-01T15:20:00.000Z",
+      "updated_at": "2026-11-07T17:30:00.000Z",
+      "completed_at": null,
+      "archived_at": null
+    },
+    {
+      "id": "t-ops-inventory",
+      "title": "Inventory the spare-parts shelf",
+      "description": "Two switches, a box of patch leads and at least one PSU that may not work.",
+      "domain_id": "d-internal",
+      "project_id": null,
+      "status": "todo",
+      "position": 6144,
+      "priority": "low",
+      "due_date": "2026-11-14",
+      "recurrence": "none",
+      "recurrence_interval": 1,
+      "recurrence_parent_id": null,
+      "research_id": null,
+      "source": "demo",
+      "external_id": null,
+      "created_at": "2026-10-31T15:20:00.000Z",
+      "updated_at": "2026-11-07T17:30:00.000Z",
+      "completed_at": null,
+      "archived_at": null
+    }
+  ],
+  "notes": [
+    {
+      "id": "n-ng-1",
+      "task_id": "t-ng-schedule",
+      "project_id": null,
+      "body": "Dana prefers Tuesdays after 6pm — the last patient leaves at 5:30. Confirmed the alarm code goes to Marcus, not to us.",
+      "created_at": "2026-11-06T10:05:00.000Z",
+      "updated_at": "2026-11-06T10:05:00.000Z"
+    },
+    {
+      "id": "n-lk-1",
+      "task_id": "t-lk-headshots",
+      "project_id": null,
+      "body": "Two of six agents have sent photos. Chased the office manager on Monday; she is waiting on the agents.",
+      "created_at": "2026-11-06T10:05:00.000Z",
+      "updated_at": "2026-11-06T10:05:00.000Z"
+    }
+  ],
+  "tags": [
+    {
+      "id": "tag-documentation",
+      "name": "documentation"
+    },
+    {
+      "id": "tag-procurement",
+      "name": "procurement"
+    },
+    {
+      "id": "tag-phone-call",
+      "name": "phone-call"
+    },
+    {
+      "id": "tag-after-hours",
+      "name": "after-hours"
+    },
+    {
+      "id": "tag-dev",
+      "name": "dev"
+    },
+    {
+      "id": "tag-waiting-on",
+      "name": "waiting-on"
+    },
+    {
+      "id": "tag-seo",
+      "name": "seo"
+    },
+    {
+      "id": "tag-backup",
+      "name": "backup"
+    },
+    {
+      "id": "tag-billing",
+      "name": "billing"
+    },
+    {
+      "id": "tag-maintenance",
+      "name": "maintenance"
+    }
+  ],
+  "task_tags": [
+    {
+      "task_id": "t-ng-rack",
+      "tag_id": "tag-documentation"
+    },
+    {
+      "task_id": "t-ng-switch",
+      "tag_id": "tag-procurement"
+    },
+    {
+      "task_id": "t-ng-schedule",
+      "tag_id": "tag-phone-call"
+    },
+    {
+      "task_id": "t-ng-cutover",
+      "tag_id": "tag-after-hours"
+    },
+    {
+      "task_id": "t-ng-diagram",
+      "tag_id": "tag-documentation"
+    },
+    {
+      "task_id": "t-lk-theme",
+      "tag_id": "tag-dev"
+    },
+    {
+      "task_id": "t-lk-headshots",
+      "tag_id": "tag-waiting-on"
+    },
+    {
+      "task_id": "t-lk-redirects",
+      "tag_id": "tag-seo"
+    },
+    {
+      "task_id": "t-sm-audit",
+      "tag_id": "tag-backup"
+    },
+    {
+      "task_id": "t-sm-quote",
+      "tag_id": "tag-procurement"
+    },
+    {
+      "task_id": "t-sm-restore",
+      "tag_id": "tag-backup"
+    },
+    {
+      "task_id": "t-ops-licences",
+      "tag_id": "tag-billing"
+    },
+    {
+      "task_id": "t-ops-invoices",
+      "tag_id": "tag-billing"
+    },
+    {
+      "task_id": "t-ops-patch",
+      "tag_id": "tag-maintenance"
+    },
+    {
+      "task_id": "t-ops-ssl",
+      "tag_id": "tag-maintenance"
+    },
+    {
+      "task_id": "t-ops-onboard",
+      "tag_id": "tag-documentation"
+    }
+  ],
+  "attachments": [],
+  "research": [
+    {
+      "id": "r-cond-access",
+      "name": "Microsoft 365 Conditional Access",
+      "domain_id": "d-northgate",
+      "status": "learning",
+      "level": 2,
+      "tags": [
+        "m365",
+        "security"
+      ],
+      "body": "## Why\nEvery client on M365 Business Premium can enforce MFA and device compliance without buying anything else.\n\n## Notes\n- **Named locations** first, then a break-glass account excluded from every policy\n- Report-only mode for two weeks before enforcing\n- `Sign-in logs` → Conditional Access tab tells you which policy fired\n- Break-glass account: long password in the client's password manager, MFA on a phone the owner holds",
+      "links": [
+        {
+          "id": "l-ca-1",
+          "label": "Microsoft Learn — Conditional Access",
+          "url": "https://learn.microsoft.com/en-us/entra/identity/conditional-access/"
+        }
+      ],
+      "log": [
+        {
+          "id": "log-ca-1",
+          "body": "Walked through named locations and a break-glass exclusion on the test tenant.",
+          "created_at": "2026-11-06T15:10:00.000Z"
+        }
+      ],
+      "created_at": "2026-10-23T14:05:00.000Z",
+      "updated_at": "2026-11-06T14:05:00.000Z"
+    },
+    {
+      "id": "r-vlan",
+      "name": "VLAN design for small offices",
+      "domain_id": "d-northgate",
+      "status": "using",
+      "level": 3,
+      "tags": [
+        "networking"
+      ],
+      "body": "- One VLAN for staff, one for guest Wi-Fi, one for the phones and printers\n- Guest VLAN: client isolation on, no route to staff\n- Printers on the staff VLAN — mDNS does not cross VLANs without help\n- `show vlan brief` after every change, then ping the gateway from both sides",
+      "links": [
+        {
+          "id": "l-vlan-1",
+          "label": "UniFi — VLAN configuration",
+          "url": "https://help.ui.com/hc/en-us/articles/360016352213"
+        }
+      ],
+      "log": [],
+      "created_at": "2026-10-09T14:05:00.000Z",
+      "updated_at": "2026-11-02T14:05:00.000Z"
+    },
+    {
+      "id": "r-3-2-1",
+      "name": "3-2-1 backup rule",
+      "domain_id": "d-internal",
+      "status": "explore",
+      "level": 1,
+      "tags": [
+        "backup"
+      ],
+      "body": "Questions to settle before the Summit quote:\n- Is the offsite copy at the owner's second office \"offsite\" enough?\n- Restore test every quarter, or every month?\n- Who checks the job report when it goes red at 2am?",
+      "links": [],
+      "log": [],
+      "created_at": "2026-10-30T14:05:00.000Z",
+      "updated_at": "2026-10-30T14:05:00.000Z"
+    }
+  ]
+}
